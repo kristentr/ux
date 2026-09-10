@@ -1,0 +1,8 @@
+{# @block content The header area, typically contains `Card:Title`. #}
+<div
+    {{ attributes.defaults({
+        class: 'pb-6'|tailwind_classes,
+    }) }}
+>
+    {%- block content %}{% endblock -%}
+</div>

@@ -1,5 +1,35 @@
 # CHANGELOG
 
+## 3.5.0
+
+- Fix broadcasting an entity whose identifier is made of associations
+
+## 3.2.0
+
+- Prevent installation alongside `symfony/mercure` 0.7.0 and 0.7.1, which are incompatible
+
+## 3.1.0
+
+- Add a minimal layout for Turbo Frame responses, allowing `head` content like meta tags to work properly
+- Add `TurboFrame` service methods and Twig functions `turbo_is_frame_request()`/`turbo_frame_request_id()` to detect Turbo Frame requests
+- Add `<turbo-mercure-stream-source>` custom element, `turbo_stream_from()` Twig function and `<twig:Turbo:Stream:From>` Twig component
+- Deprecate `turbo_stream_listen()` Twig function, use `turbo_stream_from()` or the `<twig:Turbo:Stream:From>` Twig component instead
+- Deprecate `Symfony\UX\Turbo\Twig\TurboStreamListenRendererInterface` interface, use `Symfony\UX\Turbo\StreamSourceRendererInterface` instead
+- Deprecate `Symfony\UX\Turbo\Bridge\Mercure\TurboStreamListenRenderer` class, use `Symfony\UX\Turbo\Bridge\Mercure\MercureStreamSourceRenderer` instead
+- Deprecate `Symfony\UX\Turbo\Bridge\Mercure\TopicSet` class
+- Deprecate the `mercure-turbo-stream` Stimulus controller, use the `<turbo-mercure-stream-source>` custom element instead
+
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- Remove old compatibility layer with deprecated `StimulusTwigExtension` from WebpackEncoreBundle ^1.0, use StimulusBundle instead
+- Remove BC layer for `TurboStreamListenRendererInterface::renderTurboStreamListen()` `$eventSourceOptions` parameter
+
+## 2.35
+
+- Allow Symfony UX 3.x packages
+
 ## 2.32
 
 - Add support for MercureBundle ^0.4.1 and Mercure ^0.7.0

@@ -11,20 +11,21 @@
 
 namespace Symfony\UX\TwigComponent\Tests\Integration;
 
-use Symfony\Bridge\PhpUnit\ExpectDeprecationTrait;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\UX\TwigComponent\Tests\Fixtures\User;
 use Twig\Environment;
 use Twig\Error\RuntimeError;
+use Twig\Error\SyntaxError;
+use Twig\Extra\Html\HtmlAttr\AttributeValueInterface;
+use Twig\Extra\Html\HtmlAttr\MergeableInterface;
 
 /**
  * @author Kevin Bond <kevinbond@gmail.com>
  */
 final class ComponentExtensionTest extends KernelTestCase
 {
-    use ExpectDeprecationTrait;
-
-    public function testCanRenderComponent()
+    public function testCanRenderComponent(): void
     {
         $output = $this->renderComponent('component_a', [
             'propA' => 'prop a value',
@@ -36,7 +37,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('service: service a value', $output);
     }
 
-    public function testCanRenderTheSameComponentMultipleTimes()
+    public function testCanRenderTheSameComponentMultipleTimes(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('multi_render.html.twig');
 
@@ -49,7 +50,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('service: service a value', $output);
     }
 
-    public function testCanRenderComponentWithMoreAdvancedTwigExpressions()
+    public function testCanRenderComponentWithMoreAdvancedTwigExpressions(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('flexible_component_attributes.html.twig');
 
@@ -64,28 +65,28 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('service: service a value', $output);
     }
 
-    public function testCanNotRenderComponentWithInvalidExpressions()
+    public function testCanNotRenderComponentWithInvalidExpressions(): void
     {
         $this->expectException(\Throwable::class);
 
         self::getContainer()->get(Environment::class)->render('invalid_flexible_component.html.twig');
     }
 
-    public function testCanCustomizeTemplateWithAttribute()
+    public function testCanCustomizeTemplateWithAttribute(): void
     {
         $output = $this->renderComponent('component_b', ['value' => 'b value 1']);
 
         $this->assertStringContainsString('Custom template 1', $output);
     }
 
-    public function testCanCustomizeTemplateWithServiceTag()
+    public function testCanCustomizeTemplateWithServiceTag(): void
     {
         $output = $this->renderComponent('component_d', ['value' => 'b value 1']);
 
         $this->assertStringContainsString('Custom template 2', $output);
     }
 
-    public function testCanRenderComponentWithAttributes()
+    public function testCanRenderComponentWithAttributes(): void
     {
         $output = $this->renderComponent('with_attributes', [
             'prop' => 'prop value 1',
@@ -109,14 +110,14 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('<button class="foo baz" type="submit" style="color:red;">', $output);
     }
 
-    public function testCanSetCustomAttributesVariable()
+    public function testCanSetCustomAttributesVariable(): void
     {
         $output = $this->renderComponent('custom_attributes', ['class' => 'from-custom']);
 
         $this->assertStringContainsString('<div class="from-custom"></div>', $output);
     }
 
-    public function testRenderComponentWithExposedVariables()
+    public function testRenderComponentWithExposedVariables(): void
     {
         $output = $this->renderComponent('with_exposed_variables');
 
@@ -128,7 +129,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('customMethod: customMethod value', $output);
     }
 
-    public function testCanUseComputedMethods()
+    public function testCanUseComputedMethods(): void
     {
         $output = $this->renderComponent('computed_component');
 
@@ -141,14 +142,14 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('propComputed: value', $output);
     }
 
-    public function testCanDisableExposingPublicProps()
+    public function testCanDisableExposingPublicProps(): void
     {
         $output = $this->renderComponent('no_public_props');
 
         $this->assertStringContainsString('NoPublicProp1: default', $output);
     }
 
-    public function testCanRenderEmbeddedComponent()
+    public function testCanRenderEmbeddedComponent(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('embedded_component.html.twig');
 
@@ -157,14 +158,195 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('custom td (1)', $output);
     }
 
-    public function testComponentWithNamespace()
+    public function testCanRenderEmbeddedComponentWithDynamicNameBuiltInLoop(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('{% set prefix = "DynamicNameComponent" %}{% for i in 1..2 %}{% component (prefix ~ i) %}{% endcomponent %}{% endfor %}');
+
+        $output = $template->render();
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+        $this->assertStringContainsString('DynamicNameComponent2 rendered', $output);
+    }
+
+    public function testThrowsWhenDynamicComponentNameDoesNotExist(): void
+    {
+        $this->expectException(RuntimeError::class);
+        $this->expectExceptionMessage('Unknown component "DynamicNameComponent3".');
+
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('{% set prefix = "DynamicNameComponent" %}{% component (prefix ~ 3) %}{% endcomponent %}');
+        $template->render();
+    }
+
+    #[DataProvider('provideDynamicComponentNameExpressions')]
+    public function testCanRenderEmbeddedComponentFromExpression(string $template, array $context, array $expectedComponents): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $output = $environment->createTemplate($template)->render($context);
+
+        foreach ($expectedComponents as $expectedComponent) {
+            $this->assertStringContainsString($expectedComponent.' rendered', $output);
+        }
+    }
+
+    public static function provideDynamicComponentNameExpressions(): iterable
+    {
+        yield 'array index' => [
+            '{% for i in 0..1 %}{% component (componentsArray[i]) %}{% endcomponent %}{% endfor %}',
+            ['componentsArray' => ['DynamicNameComponent1', 'DynamicNameComponent2']],
+            ['DynamicNameComponent1', 'DynamicNameComponent2'],
+        ];
+        yield 'component name variable' => [
+            '{% component (componentNameVariable) %}{% endcomponent %}',
+            ['componentNameVariable' => 'DynamicNameComponent1'],
+            ['DynamicNameComponent1'],
+        ];
+        yield 'string variable' => [
+            '{% component (stringVariable) %}{% endcomponent %}',
+            ['stringVariable' => 'DynamicNameComponent2'],
+            ['DynamicNameComponent2'],
+        ];
+    }
+
+    public function testThrowsWhenStringVariableExpressionIsNotWrappedInParentheses(): void
+    {
+        $this->expectException(RuntimeError::class);
+        $this->expectExceptionMessage('Unknown component "stringVariable"');
+
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('{% component stringVariable %}{% endcomponent %}');
+        $template->render([
+            'stringVariable' => 'DynamicNameComponent2',
+        ]);
+    }
+
+    public function testBareComponentNameStaysStaticWhenSameNamedVariableExists(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('{% component DynamicNameComponent1 %}{% endcomponent %}');
+        $output = $template->render([
+            'DynamicNameComponent1' => 'DynamicNameComponent2',
+        ]);
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+        $this->assertStringNotContainsString('DynamicNameComponent2 rendered', $output);
+    }
+
+    public function testThrowsWhenExpressionDoesNotEvaluateToAComponentName(): void
+    {
+        $this->expectException(SyntaxError::class);
+        $this->expectExceptionMessage('must evaluate to a component name (string/scalar/Stringable)');
+        $this->expectExceptionMessage('stdClass');
+
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('{% component (obj) %}{% endcomponent %}');
+        $template->render(['obj' => new \stdClass()]);
+    }
+
+    public function testCanRenderSelfClosingDynamicComponentWithStaticIs(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:component is="DynamicNameComponent1" />');
+        $output = $template->render();
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+    }
+
+    public function testCanRenderSelfClosingDynamicComponentWithDynamicIs(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:component :is="componentName" />');
+        $output = $template->render(['componentName' => 'DynamicNameComponent1']);
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+    }
+
+    public function testCanRenderPairedDynamicComponentWithStaticIs(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:component is="DynamicNameComponent1">content</twig:component>');
+        $output = $template->render();
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+    }
+
+    public function testCanRenderPairedDynamicComponentWithDynamicIs(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:component :is="componentName">content</twig:component>');
+        $output = $template->render(['componentName' => 'DynamicNameComponent1']);
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+    }
+
+    public function testCanRenderDynamicComponentWithDynamicIsInLoop(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('{% set prefix = "DynamicNameComponent" %}{% for i in 1..2 %}<twig:component :is="prefix ~ i" />{% endfor %}');
+        $output = $template->render();
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+        $this->assertStringContainsString('DynamicNameComponent2 rendered', $output);
+    }
+
+    public function testCanRenderDynamicComponentWithDynamicIsFromArray(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('{% for i in 0..1 %}<twig:component :is="names[i]" />{% endfor %}');
+        $output = $template->render(['names' => ['DynamicNameComponent1', 'DynamicNameComponent2']]);
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+        $this->assertStringContainsString('DynamicNameComponent2 rendered', $output);
+    }
+
+    public function testCanRenderDynamicComponentWithPropsViaStaticIs(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:component is="component_a" propA="A" propB="B" />');
+        $output = $template->render();
+
+        $this->assertStringContainsString('propA: A', $output);
+        $this->assertStringContainsString('propB: B', $output);
+    }
+
+    public function testCanRenderDynamicComponentWithPropsViaDynamicIs(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:component :is="name" propA="A" propB="B" />');
+        $output = $template->render(['name' => 'component_a']);
+
+        $this->assertStringContainsString('propA: A', $output);
+        $this->assertStringContainsString('propB: B', $output);
+    }
+
+    public function testThrowsWhenDynamicComponentHtmlSyntaxNameDoesNotExist(): void
+    {
+        $this->expectException(RuntimeError::class);
+        $this->expectExceptionMessage('Unknown component "NonExistent"');
+
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:component :is="name" />');
+        $template->render(['name' => 'NonExistent']);
+    }
+
+    public function testCanRenderDynamicComponentInsideRegularComponent(): void
+    {
+        $environment = self::getContainer()->get(Environment::class);
+        $template = $environment->createTemplate('<twig:BasicComponent><twig:component :is="name" /></twig:BasicComponent>');
+        $output = $template->render(['name' => 'DynamicNameComponent1']);
+
+        $this->assertStringContainsString('DynamicNameComponent1 rendered', $output);
+    }
+
+    public function testComponentWithNamespace(): void
     {
         $output = $this->renderComponent('foo:bar:baz');
 
         $this->assertStringContainsString('Content...', $output);
     }
 
-    public function testRenderAnonymousComponent()
+    public function testRenderAnonymousComponent(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('anonymous_component.html.twig');
 
@@ -172,7 +354,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('class="primary"', $output);
     }
 
-    public function testRenderAnonymousComponentOverwriteProps()
+    public function testRenderAnonymousComponentOverwriteProps(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('anonymous_component_overwrite_props.html.twig');
 
@@ -180,7 +362,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('class="secondary"', $output);
     }
 
-    public function testRenderAnonymousComponentInNestedDirectory()
+    public function testRenderAnonymousComponentInNestedDirectory(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('anonymous_component_nested_directory.html.twig');
 
@@ -188,7 +370,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('class="primary"', $output);
     }
 
-    public function testRenderAnonymousComponentWithNonScalarProps()
+    public function testRenderAnonymousComponentWithNonScalarProps(): void
     {
         $user = new User('Fabien', 'test@test.com');
 
@@ -200,21 +382,86 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('class variable defined? no', $output);
     }
 
-    public function testComponentPropsOverwriteContextValue()
+    public function testRenderComponentTagWithNullsafeProps(): void
+    {
+        if (Environment::VERSION_ID < 32300) {
+            $this->markTestSkipped('The "?." operator requires Twig 3.23+.');
+        }
+
+        $city = new \stdClass();
+        $city->organisation = null;
+
+        $item = new \stdClass();
+        $item->city = $city;
+        $item->title = 'Title';
+
+        $output = self::getContainer()->get(Environment::class)->render('anonymous_component_nullsafe_props.html.twig', [
+            'item' => $item,
+        ]);
+
+        $this->assertSame(3, substr_count($output, '- Title'));
+    }
+
+    public function testComponentPropsOverwriteContextValue(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('anonymous_component_with_variable_already_in_context.html.twig');
 
         $this->assertStringContainsString('<p>foo</p>', $output);
     }
 
-    public function testComponentPropsOverwriteContextValueWithInputProp()
+    public function testComponentPropsOverwriteContextValueWithInputProp(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('anonymous_component_with_input_prop_with_same_name_in_context.html.twig');
 
         $this->assertStringContainsString('<p>bar</p>', $output);
     }
 
-    public function testComponentPropsWithTrailingComma()
+    public function testComponentPropWithoutDefaultAcceptsNullValue(): void
+    {
+        $output = self::getContainer()->get(Environment::class)->render('anonymous_component_with_null_props.html.twig');
+
+        $this->assertStringContainsString('<p>required: NULL</p>', $output);
+    }
+
+    public function testComponentPropWithoutDefaultAndWithoutValueThrows(): void
+    {
+        $this->expectException(RuntimeError::class);
+        $this->expectExceptionMessage('Prop "required" should be defined in "components/NullableProps.html.twig" at line 1.');
+
+        self::getContainer()->get(Environment::class)->render('anonymous_component_with_missing_required_prop.html.twig');
+    }
+
+    public function testComponentPropWithDefaultKeepsNullValueExplicitlyPassed(): void
+    {
+        $output = self::getContainer()->get(Environment::class)->render('anonymous_component_with_null_props.html.twig');
+
+        $this->assertStringContainsString('<p>withDefault: NULL</p>', $output);
+    }
+
+    public function testComponentPropWithDefaultIgnoresNullValueFromContext(): void
+    {
+        $output = self::getContainer()->get(Environment::class)->render('anonymous_component_with_null_variable_already_in_context.html.twig');
+
+        $this->assertStringContainsString('<p>withDefault: default</p>', $output);
+    }
+
+    public function testComponentClassPropertyWithDefaultKeepsNullValueExplicitlyPassed(): void
+    {
+        $output = self::getContainer()->get(Environment::class)->render('class_component_with_null_props.html.twig');
+
+        $this->assertStringContainsString('<p>property: NULL</p>', $output);
+        $this->assertStringContainsString('<p>mounted: NULL</p>', $output);
+    }
+
+    public function testComponentClassPropertyWithDefaultKeepsItWhenPropIsNotPassed(): void
+    {
+        $output = self::getContainer()->get(Environment::class)->render('class_component_with_omitted_props.html.twig');
+
+        $this->assertStringContainsString('<p>property: default</p>', $output);
+        $this->assertStringContainsString('<p>mounted: default</p>', $output);
+    }
+
+    public function testComponentPropsWithTrailingComma(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('anonymous_component_props_trailing_comma.html.twig');
 
@@ -222,10 +469,8 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('Hello FOO, 123, and 456', $output);
     }
 
-    /**
-     * @dataProvider renderingAttributesManuallyProvider
-     */
-    public function testRenderingAttributesManually(array $attributes, string $expected)
+    #[DataProvider('renderingAttributesManuallyProvider')]
+    public function testRenderingAttributesManually(array $attributes, string $expected): void
     {
         $actual = trim($this->renderComponent('RenderAttributes', $attributes));
 
@@ -267,19 +512,7 @@ final class ComponentExtensionTest extends KernelTestCase
         ];
     }
 
-    /**
-     * @group legacy
-     */
-    public function testComponentWithClassMerge()
-    {
-        $this->expectDeprecation('Since symfony/ux-twig-component 2.20: Twig Function "cva" is deprecated; use "html_cva" from the "twig/html-extra" package (available since version 3.12) instead.');
-
-        $output = self::getContainer()->get(Environment::class)->render('class_merge.html.twig');
-
-        $this->assertStringContainsString('class="alert alert-red alert-lg font-semibold rounded-md dark:bg-gray-600 flex p-4"', $output);
-    }
-
-    public function testRenderingComponentWithNestedAttributes()
+    public function testRenderingComponentWithNestedAttributes(): void
     {
         $output = $this->renderComponent('NestedAttributes');
 
@@ -318,10 +551,8 @@ final class ComponentExtensionTest extends KernelTestCase
         );
     }
 
-    /**
-     * @dataProvider providePrefixedAttributesCases
-     */
-    public function testRenderPrefixedAttributes(string $attributes, bool $expectContains)
+    #[DataProvider('providePrefixedAttributesCases')]
+    public function testRenderPrefixedAttributes(string $attributes, bool $expectContains): void
     {
         /** @var Environment $twig */
         $twig = self::getContainer()->get(Environment::class);
@@ -370,7 +601,7 @@ final class ComponentExtensionTest extends KernelTestCase
         yield ['z-bind:id', false]; // Nested
     }
 
-    public function testRenderingHtmlSyntaxComponentWithNestedAttributes()
+    public function testRenderingHtmlSyntaxComponentWithNestedAttributes(): void
     {
         $output = self::getContainer()
             ->get(Environment::class)
@@ -413,7 +644,7 @@ final class ComponentExtensionTest extends KernelTestCase
         );
     }
 
-    public function testComponentWithPropsFromTemplateAndClass()
+    public function testComponentWithPropsFromTemplateAndClass(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('component_with_props_from_template_and_class.html.twig');
 
@@ -422,7 +653,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('Congrats !', $output);
     }
 
-    public function testComponentWithConflictBetweenPropsFromTemplateAndClass()
+    public function testComponentWithConflictBetweenPropsFromTemplateAndClass(): void
     {
         $this->expectException(RuntimeError::class);
         $this->expectExceptionMessage('Cannot define prop "name" in template "components/Conflict.html.twig". Property already defined in component class "Symfony\UX\TwigComponent\Tests\Fixtures\Component\Conflict"');
@@ -430,17 +661,23 @@ final class ComponentExtensionTest extends KernelTestCase
         self::getContainer()->get(Environment::class)->render('component_with_conflict_between_props_from_template_and_class.html.twig');
     }
 
-    public function testComponentWithEmptyProps()
+    public function testComponentWithConflictBetweenNullPropFromTemplateAndClass(): void
+    {
+        $this->expectException(RuntimeError::class);
+        $this->expectExceptionMessage('Cannot define prop "name" in template "components/NullableConflict.html.twig". Property already defined in component class "Symfony\\UX\\TwigComponent\\Tests\\Fixtures\\Component\\NullableConflict"');
+
+        self::getContainer()->get(Environment::class)->render('component_with_conflict_between_null_prop_from_template_and_class.html.twig');
+    }
+
+    public function testComponentWithEmptyProps(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('anonymous_component_with_empty_props.html.twig');
 
         $this->assertStringContainsString('I have an empty props tag', $output);
     }
 
-    /**
-     * @dataProvider provideUnsafeAttributes
-     */
-    public function testHtmlSyntaxEscapesAttributeValues(string $input)
+    #[DataProvider('provideUnsafeAttributes')]
+    public function testHtmlSyntaxEscapesAttributeValues(string $input): void
     {
         $output = self::getContainer()->get(Environment::class)->render(
             'anonymous_component_with_html_syntax.html.twig',
@@ -451,10 +688,8 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('&lt;scr', $output);
     }
 
-    /**
-     * @dataProvider provideUnsafeAttributes
-     */
-    public function testDynamicSyntaxEscapesAttributeValues(string $input)
+    #[DataProvider('provideUnsafeAttributes')]
+    public function testDynamicSyntaxEscapesAttributeValues(string $input): void
     {
         $output = self::getContainer()->get(Environment::class)->render(
             'anonymous_component_with_dynamic_syntax.html.twig',
@@ -475,20 +710,7 @@ final class ComponentExtensionTest extends KernelTestCase
         ]);
     }
 
-    /**
-     * @group legacy
-     */
-    public function testAnonymousComponentWithPropsOverwriteParentsProps()
-    {
-        $this->expectDeprecation('Since symfony/ux-twig-component 2.20: Twig Function "cva" is deprecated; use "html_cva" from the "twig/html-extra" package (available since version 3.12) instead.');
-
-        $output = self::getContainer()->get(Environment::class)->render('anonymous_component_with_props_overwrite_parents_props.html.twig');
-
-        $this->assertStringContainsString('I am an icon', $output);
-        $this->assertStringNotContainsString('I am md', $output);
-    }
-
-    public function testHigherOrderComponentWithAttributeDefaults()
+    public function testHigherOrderComponentWithAttributeDefaults(): void
     {
         $output = self::getContainer()->get(Environment::class)->render('higher_order_component.html.twig');
 
@@ -513,7 +735,7 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('Confirm deletion?', $output);
     }
 
-    public function testPropsAreRemovedFromAttributesInSingleCall()
+    public function testPropsAreRemovedFromAttributesInSingleCall(): void
     {
         $output = $this->renderComponent('PropsAndAttributesSeparation', [
             'propA' => 'valueA',
@@ -553,7 +775,7 @@ final class ComponentExtensionTest extends KernelTestCase
      * This is a regression test for the optimization that iterates directly over
      * attributes->all() instead of iterating over the entire context.
      */
-    public function testExtraAttributesAreCleanedFromContext()
+    public function testExtraAttributesAreCleanedFromContext(): void
     {
         $output = $this->renderComponent('PropsAndAttributesSeparation', [
             'propA' => 'A',
@@ -577,7 +799,7 @@ final class ComponentExtensionTest extends KernelTestCase
     /**
      * Test that props with default values work correctly when not provided.
      */
-    public function testPropsWithDefaultValuesWhenNotProvided()
+    public function testPropsWithDefaultValuesWhenNotProvided(): void
     {
         $output = $this->renderComponent('PropsAndAttributesSeparation', [
             'propA' => 'A',
@@ -601,7 +823,7 @@ final class ComponentExtensionTest extends KernelTestCase
      * attributes->all() to unset context variables, ensuring non-prop attributes
      * are properly cleaned from the context.
      */
-    public function testAttributesDoNotLeakToTemplateContext()
+    public function testAttributesDoNotLeakToTemplateContext(): void
     {
         $output = $this->renderComponent('AttributesNotLeakingToContext', [
             'name' => 'test-name',
@@ -622,6 +844,36 @@ final class ComponentExtensionTest extends KernelTestCase
         $this->assertStringContainsString('class-var-defined=no', $output);
         $this->assertStringContainsString('style-var-defined=no', $output);
         $this->assertStringContainsString('data_foo-var-defined=no', $output);
+    }
+
+    public function testPropsWithHtmlAttrMergeFilter(): void
+    {
+        if (!interface_exists(AttributeValueInterface::class)) {
+            $this->markTestSkipped('Test requires Twig HTML extra >= 3.24.');
+        }
+
+        $output = self::getContainer()->get(Environment::class)->render('html_attr_merge.html.twig');
+
+        $this->assertStringContainsString('class="primary"', $output);
+        $this->assertStringContainsString('data-action="click-&gt;dialog#open mouseenter-&gt;tooltip#show mouseleave-&gt;tooltip#hide focus-&gt;tooltip#show blur-&gt;tooltip#hide"', $output);
+        // When no HTML Attr Type has been defined, the very last takes precedence
+        $this->assertStringContainsString('data-no-html-attr-type="trigger"', $output);
+        $this->assertStringContainsString('data-html-attr-type-cst="dialog, trigger"', $output);
+    }
+
+    public function testDefaultsWithMergeableFilter(): void
+    {
+        if (!interface_exists(MergeableInterface::class)) {
+            $this->markTestSkipped('Test requires Twig HTML extra >= 3.24.');
+        }
+
+        $output = self::getContainer()->get(Environment::class)->render('mergeable_tokens.html.twig');
+
+        // "data-foo" is not one of the special (class/data-controller/data-action) keys:
+        // without the MergeableInterface routing the caller value would simply override the
+        // default ("c"). Getting the merged "a b c" proves the protocol runs for any key,
+        // across the full component render.
+        $this->assertStringContainsString('data-foo="a b c"', $output);
     }
 
     private function renderComponent(string $name, array $data = []): string

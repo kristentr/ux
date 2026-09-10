@@ -9,8 +9,8 @@
 
 /// <reference types="google.maps" />
 
-import type { LoaderOptions } from '@googlemaps/js-api-loader';
-import { Loader } from '@googlemaps/js-api-loader';
+import type { APIOptions } from '@googlemaps/js-api-loader';
+import { importLibrary, setOptions } from '@googlemaps/js-api-loader';
 import type {
     CircleDefinition,
     Icon,
@@ -39,8 +39,6 @@ type MapOptions = Pick<
     | 'fullscreenControlOptions'
 >;
 
-let _google: typeof google;
-
 // Loading the Google Maps API is an asynchronous operation, so we need to track the loading state to prevent race conditions.
 let _loading = false;
 let _loaded = false;
@@ -66,8 +64,16 @@ export default class extends AbstractMapController<
     google.maps.Rectangle
 > {
     declare providerOptionsValue: Pick<
-        LoaderOptions,
-        'apiKey' | 'id' | 'language' | 'region' | 'nonce' | 'retries' | 'url' | 'version' | 'libraries'
+        APIOptions,
+        | 'key'
+        | 'v'
+        | 'language'
+        | 'region'
+        | 'libraries'
+        | 'authReferrerPolicy'
+        | 'mapIds'
+        | 'channel'
+        | 'solutionChannel'
     >;
 
     declare map: google.maps.Map;
@@ -86,32 +92,13 @@ export default class extends AbstractMapController<
         }
 
         _loading = true;
-        _google = { maps: {} as typeof google.maps };
 
         let { libraries = [], ...loaderOptions } = this.providerOptionsValue;
 
-        const loader = new Loader(loaderOptions);
+        setOptions(loaderOptions);
 
-        // We could have used `loader.load()` to correctly load libraries, but this method is deprecated in favor of `loader.importLibrary()`.
-        // But `loader.importLibrary()` is not a 1-1 replacement for `loader.load()`, we need to re-build the `google.maps` object ourselves,
-        // see https://github.com/googlemaps/js-api-loader/issues/837 for more information.
         libraries = ['core', ...libraries.filter((library) => library !== 'core')]; // Ensure 'core' is loaded first
-        const librariesImplementations = await Promise.all(libraries.map((library) => loader.importLibrary(library)));
-        librariesImplementations.forEach((libraryImplementation, index) => {
-            if (typeof libraryImplementation !== 'object' || libraryImplementation === null) {
-                return;
-            }
-
-            const library = libraries[index];
-
-            // The following libraries are in a sub-namespace
-            if (['marker', 'places', 'geometry', 'journeySharing', 'drawing', 'visualization'].includes(library)) {
-                // @ts-expect-error
-                _google.maps[library] = libraryImplementation as any;
-            } else {
-                _google.maps = { ..._google.maps, ...libraryImplementation };
-            }
-        });
+        await Promise.all(libraries.map((library) => importLibrary(library)));
 
         _loading = false;
         _loaded = true;
@@ -147,7 +134,7 @@ export default class extends AbstractMapController<
     }
 
     protected dispatchEvent(name: string, payload: Record<string, unknown> = {}): void {
-        payload.google = _google;
+        payload.google = google;
         this.dispatch(name, {
             prefix: 'ux:map',
             detail: payload,
@@ -167,7 +154,7 @@ export default class extends AbstractMapController<
         options.streetViewControl = typeof options.streetViewControlOptions !== 'undefined';
         options.fullscreenControl = typeof options.fullscreenControlOptions !== 'undefined';
 
-        return new _google.maps.Map(this.element, {
+        return new google.maps.Map(this.element, {
             center,
             zoom,
             minZoom,
@@ -182,13 +169,12 @@ export default class extends AbstractMapController<
     }: {
         definition: MarkerDefinition<google.maps.marker.AdvancedMarkerElementOptions, google.maps.InfoWindowOptions>;
     }): google.maps.marker.AdvancedMarkerElement {
-        const { '@id': _id, position, title, infoWindow, icon, rawOptions = {}, bridgeOptions = {} } = definition;
+        const { '@id': _id, position, title, infoWindow, icon, bridgeOptions = {} } = definition;
 
-        const marker = new _google.maps.marker.AdvancedMarkerElement({
+        const marker = new google.maps.marker.AdvancedMarkerElement({
             position,
             title,
             map: this.map,
-            ...rawOptions,
             ...bridgeOptions,
         });
 
@@ -200,10 +186,6 @@ export default class extends AbstractMapController<
             if (Object.prototype.hasOwnProperty.call(bridgeOptions, 'content')) {
                 console.warn(
                     '[Symfony UX Map] Defining "bridgeOptions.content" for a marker with a custom icon is not supported and will be ignored.'
-                );
-            } else if (Object.prototype.hasOwnProperty.call(rawOptions, 'content')) {
-                console.warn(
-                    '[Symfony UX Map] Defining "rawOptions.content" for a marker with a custom icon is not supported and will be ignored.'
                 );
             }
 
@@ -222,21 +204,13 @@ export default class extends AbstractMapController<
     }: {
         definition: PolygonDefinition<google.maps.PolygonOptions, google.maps.InfoWindowOptions>;
     }): google.maps.Polygon {
-        const { '@id': _id, points, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
+        const { '@id': _id, points, infoWindow, bridgeOptions = {} } = definition;
 
-        const polygon = new _google.maps.Polygon({
+        const polygon = new google.maps.Polygon({
             paths: points,
             map: this.map,
-            ...rawOptions,
             ...bridgeOptions,
         });
-
-        /**
-         * @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-         */
-        if (title) {
-            polygon.set('title', title);
-        }
 
         if (infoWindow) {
             this.createInfoWindow({ definition: infoWindow, element: polygon });
@@ -254,21 +228,13 @@ export default class extends AbstractMapController<
     }: {
         definition: PolylineDefinition<google.maps.PolylineOptions, google.maps.InfoWindowOptions>;
     }): google.maps.Polyline {
-        const { '@id': _id, points, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
+        const { '@id': _id, points, infoWindow, bridgeOptions = {} } = definition;
 
-        const polyline = new _google.maps.Polyline({
+        const polyline = new google.maps.Polyline({
             path: points,
             map: this.map,
-            ...rawOptions,
             ...bridgeOptions,
         });
-
-        /**
-         * @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-         */
-        if (title) {
-            polyline.set('title', title);
-        }
 
         if (infoWindow) {
             this.createInfoWindow({ definition: infoWindow, element: polyline });
@@ -286,22 +252,14 @@ export default class extends AbstractMapController<
     }: {
         definition: CircleDefinition<google.maps.CircleOptions, google.maps.InfoWindowOptions>;
     }): google.maps.Circle {
-        const { '@id': _id, center, radius, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
+        const { '@id': _id, center, radius, infoWindow, bridgeOptions = {} } = definition;
 
-        const circle = new _google.maps.Circle({
+        const circle = new google.maps.Circle({
             center,
             radius,
             map: this.map,
-            ...rawOptions,
             ...bridgeOptions,
         });
-
-        /**
-         * @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-         */
-        if (title) {
-            circle.set('title', title);
-        }
 
         if (infoWindow) {
             this.createInfoWindow({ definition: infoWindow, element: circle });
@@ -319,21 +277,13 @@ export default class extends AbstractMapController<
     }: {
         definition: RectangleDefinition<google.maps.RectangleOptions, google.maps.InfoWindowOptions>;
     }): google.maps.Rectangle {
-        const { northEast, southWest, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
+        const { northEast, southWest, infoWindow, bridgeOptions = {} } = definition;
 
-        const rectangle = new _google.maps.Rectangle({
-            bounds: new _google.maps.LatLngBounds(southWest, northEast),
+        const rectangle = new google.maps.Rectangle({
+            bounds: new google.maps.LatLngBounds(southWest, northEast),
             map: this.map,
-            ...rawOptions,
             ...bridgeOptions,
         });
-
-        /**
-         * @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-         */
-        if (title) {
-            rectangle.set('title', title);
-        }
 
         if (infoWindow) {
             this.createInfoWindow({ definition: infoWindow, element: rectangle });
@@ -358,7 +308,7 @@ export default class extends AbstractMapController<
             | google.maps.Circle
             | google.maps.Rectangle;
     }): google.maps.InfoWindow {
-        const { headerContent, content, opened, autoClose, rawOptions = {}, bridgeOptions = {} } = definition;
+        const { headerContent, content, opened, autoClose, bridgeOptions = {} } = definition;
 
         let position: google.maps.LatLng | null = null;
         if (element instanceof google.maps.Circle) {
@@ -379,18 +329,17 @@ export default class extends AbstractMapController<
             headerContent: this.createTextOrElement(headerContent),
             content: this.createTextOrElement(content),
             position,
-            ...rawOptions,
             ...bridgeOptions,
         };
 
-        const infoWindow = new _google.maps.InfoWindow(infoWindowOptions);
+        const infoWindow = new google.maps.InfoWindow(infoWindowOptions);
 
         element.addListener('click', (event: google.maps.MapMouseEvent) => {
             if (autoClose) {
                 this.closeInfoWindowsExcept(infoWindow);
             }
 
-            // Don't override the position if it was already set (e.g. through "rawOptions")
+            // Don't override the position if it was already set (e.g. through "bridgeOptions")
             if (infoWindowOptions.position === null) {
                 infoWindow.setPosition(event.latLng);
             }

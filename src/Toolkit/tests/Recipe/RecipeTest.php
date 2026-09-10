@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Symfony package.
  *
@@ -21,7 +19,7 @@ use Symfony\UX\Toolkit\Recipe\RecipeType;
 
 final class RecipeTest extends TestCase
 {
-    public function testShouldFailWhenPathIsNotAbsolute()
+    public function testShouldFailWhenPathIsNotAbsolute(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Kit path "relative/path" is not absolute.');
@@ -29,12 +27,11 @@ final class RecipeTest extends TestCase
         new Recipe('test-recipe', 'relative/path', new RecipeManifest(
             type: RecipeType::Component,
             name: 'Test Recipe',
-            description: 'A test recipe',
             copyFiles: [],
         ));
     }
 
-    public function testShouldFailWhenInvalidCopyFiles()
+    public function testShouldFailWhenInvalidCopyFiles(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Copy file destination "/" must be a relative path.');
@@ -42,19 +39,17 @@ final class RecipeTest extends TestCase
         new Recipe('test-recipe', __DIR__.'/../../kits/shadcn/Table', new RecipeManifest(
             type: RecipeType::Component,
             name: 'Test Recipe',
-            description: 'A test recipe',
             copyFiles: [
                 'templates/' => '/',
             ],
         ));
     }
 
-    public function testGetCopyFiles()
+    public function testGetCopyFiles(): void
     {
         $recipe = new Recipe('test-recipe', __DIR__.'/../../kits/shadcn/table', new RecipeManifest(
             type: RecipeType::Component,
             name: 'Test Recipe',
-            description: 'A test recipe',
             copyFiles: [
                 'templates/' => 'templates/',
             ],
@@ -72,12 +67,11 @@ final class RecipeTest extends TestCase
         ], iterator_to_array($recipe->getFiles()));
     }
 
-    public function testGetCopyFilesWithDifferentDestDir()
+    public function testGetCopyFilesWithDifferentDestDir(): void
     {
         $recipe = new Recipe('test-recipe', __DIR__.'/../../kits/shadcn/table', new RecipeManifest(
             type: RecipeType::Component,
             name: 'Test Recipe',
-            description: 'A test recipe',
             copyFiles: [
                 'templates/' => 'dest-templates/',
             ],
@@ -93,5 +87,56 @@ final class RecipeTest extends TestCase
             new File('templates/components/Table/Header.html.twig', 'dest-templates/components/Table/Header.html.twig'),
             new File('templates/components/Table/Row.html.twig', 'dest-templates/components/Table/Row.html.twig'),
         ], iterator_to_array($recipe->getFiles()));
+    }
+
+    public function testGetDescriptionReadsTheReadmeFirstParagraph(): void
+    {
+        $manifest = new RecipeManifest(RecipeType::Component, 'Alert', []);
+
+        $withReadme = new Recipe('alert', __DIR__, $manifest, doc: "# Alert\n\nDisplays a callout for user attention.\n\n::: example Demo");
+        $this->assertSame('Displays a callout for user attention.', $withReadme->getDescription());
+
+        $this->assertNull(new Recipe('alert', __DIR__, $manifest)->getDescription());
+        $this->assertNull(new Recipe('alert', __DIR__, $manifest, doc: "# Alert\n\n::: example Demo")->getDescription());
+    }
+
+    public function testGetExamplesReturnsPreviewBlocksOnly(): void
+    {
+        $doc = <<<'MD'
+            # Avatar
+
+            A description.
+
+            ```twig
+            <twig:Avatar size="sm | md" />
+            ```
+
+            ```twig {"preview":true, "height":"150px"}
+            <twig:Avatar><twig:Avatar:Image src="x.png" /></twig:Avatar>
+            ```
+            MD;
+
+        $recipe = new Recipe('avatar', __DIR__, new RecipeManifest(
+            type: RecipeType::Component,
+            name: 'avatar',
+            copyFiles: [],
+        ), doc: $doc);
+
+        $examples = $recipe->getExamples();
+
+        $this->assertCount(1, $examples);
+        $this->assertSame('twig', $examples[0]['language']);
+        $this->assertSame('<twig:Avatar><twig:Avatar:Image src="x.png" /></twig:Avatar>', $examples[0]['code']);
+        $this->assertFalse($examples[0]['options']->collapseClass);
+    }
+
+    public function testGetExamplesIsEmptyWithoutDoc(): void
+    {
+        $recipe = new Recipe('x', __DIR__, new RecipeManifest(
+            type: RecipeType::Component,
+            name: 'x',
+            copyFiles: [],
+        ));
+        $this->assertSame([], $recipe->getExamples());
     }
 }

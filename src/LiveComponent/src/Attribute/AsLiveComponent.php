@@ -25,10 +25,15 @@ use Symfony\UX\TwigComponent\Attribute\FromMethod;
 #[\Attribute(\Attribute::TARGET_CLASS)]
 final class AsLiveComponent extends AsTwigComponent
 {
+    /**
+     * @var array<class-string, array<class-string, \ReflectionMethod[]>>
+     */
+    private static array $methodsPerAttribute = [];
+
     public string $route;
     public string $method;
-    public ?string $fetchCredentials;
     public int $urlReferenceType;
+    public ?string $fetchCredentials;
 
     private ?string $defaultAction;
 
@@ -49,43 +54,20 @@ final class AsLiveComponent extends AsTwigComponent
         ?string $defaultAction = null,
         bool $exposePublicProps = true,
         string $attributesVar = 'attributes',
-        string|bool $route = 'ux_live_component',
+        string $route = 'ux_live_component',
         string $method = 'post',
-        int|string $urlReferenceType = UrlGeneratorInterface::ABSOLUTE_PATH,
+        int $urlReferenceType = UrlGeneratorInterface::ABSOLUTE_PATH,
         ?string $fetchCredentials = null,
-        public bool|int $csrf = true, // @deprecated
     ) {
-        if (9 < \func_num_args() || \is_bool($route)) {
-            trigger_deprecation('symfony/ux-live-component', '2.21', 'Argument "$csrf" of "#[%s]" has no effect anymore and is deprecated.', static::class);
-        }
-        if (\is_bool($route)) {
-            $this->csrf = $route;
-            $route = $method;
-            $method = $urlReferenceType;
-            $urlReferenceType = $fetchCredentials;
-
-            switch (\func_num_args()) {
-                case 6: $route = 'ux_live_component';
-                    // no break
-                case 7: $method = 'post';
-                    // no break
-                case 8: $urlReferenceType = UrlGeneratorInterface::ABSOLUTE_PATH;
-                    // no break
-                case 9: $fetchCredentials = null;
-                    // no break
-                default:
-            }
-        }
-
         parent::__construct($name, $template, $exposePublicProps, $attributesVar);
 
         $this->defaultAction = $defaultAction;
         $this->route = $route;
         $this->method = strtolower($method);
-        $this->fetchCredentials = $fetchCredentials;
         $this->urlReferenceType = $urlReferenceType;
+        $this->fetchCredentials = $fetchCredentials;
 
-        if (!\in_array($method, ['get', 'post'], true)) {
+        if (!\in_array($this->method, ['get', 'post'], true)) {
             throw new \UnexpectedValueException('$method must be either \'get\' or \'post\'.');
         }
 
@@ -102,11 +84,10 @@ final class AsLiveComponent extends AsTwigComponent
         return array_merge(parent::serviceConfig(), [
             'default_action' => $this->defaultAction,
             'live' => true,
-            'csrf' => $this->csrf,
             'route' => $this->route,
             'method' => $this->method,
-            'fetch_credentials' => $this->fetchCredentials,
             'url_reference_type' => $this->urlReferenceType,
+            'fetch_credentials' => $this->fetchCredentials,
         ]);
     }
 
@@ -117,7 +98,7 @@ final class AsLiveComponent extends AsTwigComponent
      */
     public static function isActionAllowed(object|string $component, string $action): bool
     {
-        foreach (self::attributeMethodsFor(LiveAction::class, $component) as $method) {
+        foreach (self::cachedMethodsFor($component, LiveAction::class) as $method) {
             if ($action === $method->getName()) {
                 return true;
             }
@@ -135,7 +116,7 @@ final class AsLiveComponent extends AsTwigComponent
      */
     public static function preReRenderMethods(object|string $component): iterable
     {
-        return self::attributeMethodsByPriorityFor($component, PreReRender::class);
+        return self::cachedMethodsByPriorityFor($component, PreReRender::class);
     }
 
     /**
@@ -147,7 +128,7 @@ final class AsLiveComponent extends AsTwigComponent
      */
     public static function postHydrateMethods(object|string $component): iterable
     {
-        return self::attributeMethodsByPriorityFor($component, PostHydrate::class);
+        return self::cachedMethodsByPriorityFor($component, PostHydrate::class);
     }
 
     /**
@@ -159,7 +140,7 @@ final class AsLiveComponent extends AsTwigComponent
      */
     public static function preDehydrateMethods(object|string $component): iterable
     {
-        return self::attributeMethodsByPriorityFor($component, PreDehydrate::class);
+        return self::cachedMethodsByPriorityFor($component, PreDehydrate::class);
     }
 
     /**
@@ -172,12 +153,38 @@ final class AsLiveComponent extends AsTwigComponent
     public static function liveListeners(object|string $component): array
     {
         $listeners = [];
-        foreach (self::attributeMethodsFor(LiveListener::class, $component) as $method) {
+        foreach (self::cachedMethodsFor($component, LiveListener::class) as $method) {
             foreach ($method->getAttributes(LiveListener::class) as $attribute) {
                 $listeners[] = ['action' => $method->getName(), 'event' => $attribute->newInstance()->getEventName()];
             }
         }
 
         return $listeners;
+    }
+
+    /**
+     * @param object|class-string $component
+     * @param class-string        $attribute
+     *
+     * @return \ReflectionMethod[]
+     */
+    private static function cachedMethodsFor(object|string $component, string $attribute): array
+    {
+        $class = \is_object($component) ? $component::class : $component;
+
+        return self::$methodsPerAttribute[$class][$attribute] ??= iterator_to_array(self::attributeMethodsFor($attribute, $component));
+    }
+
+    /**
+     * @param object|class-string $component
+     * @param class-string        $attribute
+     *
+     * @return \ReflectionMethod[]
+     */
+    private static function cachedMethodsByPriorityFor(object|string $component, string $attribute): array
+    {
+        $class = \is_object($component) ? $component::class : $component;
+
+        return self::$methodsPerAttribute[$class][$attribute] ??= self::attributeMethodsByPriorityFor($component, $attribute);
     }
 }

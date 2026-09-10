@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- Remove `render_map()` Twig function, use `ux_map()` instead
+- Remove option `title` from `Polygon`, `Polyline`, `Rectangle` and `Circle`, use `infoWindow` instead
+- Remove property `rawOptions` from `ux:map:*:before-create` events, use `bridgeOptions` instead.
+
+## 2.35
+
+- Allow Symfony UX 3.x packages
+
 ## 2.32
 
 - Add `Map::removeAllMarkers()`, `Map::removeAllPolygons()`, `Map::removeAllPolylines()`, `Map::removeAllCircles()` and `Map::removeAllRectangles()` methods

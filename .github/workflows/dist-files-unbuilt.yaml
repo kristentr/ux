@@ -2,11 +2,15 @@ name: Dist Files Unbuilt
 
 on:
     push:
+        branches-ignore:
+            - 'dependabot/**'
         paths-ignore:
+            - 'apps/**'
             - 'src/*/doc/**'
             - 'src/**/*.md'
     pull_request:
         paths-ignore:
+            - 'apps/**'
             - 'src/*/doc/**'
             - 'src/**/*.md'
 
@@ -14,23 +18,19 @@ concurrency:
     group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
     cancel-in-progress: true
 
+permissions: {}
+
 jobs:
     check:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-
-            - run: npm i -g corepack && corepack enable
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
-                  node-version-file: '.nvmrc'
-                  cache: 'pnpm'
-                  cache-dependency-path: |
-                      pnpm-lock.yaml
-                      **/package.json
+                  persist-credentials: false
 
-            - name: Install root JS dependencies
-              run: pnpm install --frozen-lockfile
+            - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+              with:
+                  cache: true
 
             - name: Build
               run: pnpm run build

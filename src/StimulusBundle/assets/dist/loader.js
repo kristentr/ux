@@ -1,5 +1,5 @@
-import { eagerControllers, isApplicationDebug, lazyControllers } from "./controllers.js";
 import { Application } from "@hotwired/stimulus";
+import { eagerControllers, isApplicationDebug, lazyControllers } from "./controllers.js";
 const controllerAttribute = "data-controller";
 const loadControllers = (application, eagerControllers, lazyControllers) => {
 	for (const name in eagerControllers) registerController(name, eagerControllers[name], application);
@@ -40,7 +40,7 @@ var StimulusLazyControllerHandler = class {
 	}
 	lazyLoadNewControllers(element) {
 		if (Object.keys(this.lazyControllers).length === 0) return;
-		new MutationObserver((mutationsList) => {
+		const observer = new MutationObserver((mutationsList) => {
 			for (const { attributeName, target, type } of mutationsList) switch (type) {
 				case "attributes":
 					if (attributeName === controllerAttribute && target.getAttribute(controllerAttribute)) extractControllerNamesFrom(target).forEach((controllerName) => {
@@ -49,7 +49,9 @@ var StimulusLazyControllerHandler = class {
 					break;
 				case "childList": this.lazyLoadExistingControllers(target);
 			}
-		}).observe(element, {
+			if (Object.keys(this.lazyControllers).length === 0) observer.disconnect();
+		});
+		observer.observe(element, {
 			attributeFilter: [controllerAttribute],
 			subtree: true,
 			childList: true

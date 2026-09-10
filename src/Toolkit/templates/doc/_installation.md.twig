@@ -1,0 +1,48 @@
+{% if format == 'markdown' %}
+{% if recipe.manifest.versionAdded is not null %}
+> [!NOTE]
+> Available since UX Toolkit {{ recipe.manifest.versionAdded }}.
+
+{% endif %}
+```shell
+php bin/console ux:install {{ recipe.name }} --kit {{ kit_id }}
+```
+{% else %}
+::: tabs
+
+:: tab Automatic
+
+{% if recipe.manifest.versionAdded is not null %}
+> [!NOTE]
+> Available since UX Toolkit {{ recipe.manifest.versionAdded }}.
+
+{% endif %}
+```shell
+php bin/console ux:install {{ recipe.name }} --kit {{ kit_id }}
+```
+
+:: tab Manual
+{% if php_package_dependencies is not empty %}
+Install the following Composer dependencies:
+
+```shell
+composer require {{ php_package_dependencies|join(' ') }}
+```
+{% endif %}
+{% if npm_package_dependencies is not empty %}
+Install the following front-end dependencies:
+
+```shell
+npm install {{ npm_package_dependencies|join(' ') }}
+# ...or with Symfony AssetMapper
+php bin/console importmap:require {{ importmap_package_dependencies|join(' ') }}
+```
+{% endif %}
+Copy the following file(s) into your app:
+{% for file in files %}
+```{{ file.language }}{{ (file.info ? ' ' ~ file.info : '')|raw }}
+{{ file.content|trim|raw }}
+```
+{% endfor %}
+:::
+{% endif %}

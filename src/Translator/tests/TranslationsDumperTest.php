@@ -14,7 +14,9 @@ namespace Symfony\UX\Translator\Tests;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Filesystem\Filesystem;
+use Symfony\Component\Translation\Loader\ArrayLoader;
 use Symfony\Component\Translation\MessageCatalogue;
+use Symfony\Component\Translation\Translator;
 use Symfony\UX\Translator\MessageParameters\Extractor\IntlMessageParametersExtractor;
 use Symfony\UX\Translator\MessageParameters\Extractor\MessageParametersExtractor;
 use Symfony\UX\Translator\MessageParameters\Printer\TypeScriptMessageParametersPrinter;
@@ -34,7 +36,7 @@ class TranslationsDumperTest extends TestCase
         @rmdir(self::$translationsDumpDir);
     }
 
-    public function testDump()
+    public function testDump(): void
     {
         $translationsDumper = new TranslationsDumper(
             new MessageParametersExtractor(),
@@ -112,7 +114,7 @@ class TranslationsDumperTest extends TestCase
             TS);
     }
 
-    public function testShouldNotDumpTypeScriptTypes()
+    public function testShouldNotDumpTypeScriptTypes(): void
     {
         $translationsDumper = new TranslationsDumper(
             new MessageParametersExtractor(),
@@ -130,7 +132,7 @@ class TranslationsDumperTest extends TestCase
         $this->assertFileDoesNotExist(self::$translationsDumpDir.'/index.d.ts');
     }
 
-    public function testDumpWithExcludedDomains()
+    public function testDumpWithExcludedDomains(): void
     {
         $translationsDumper = new TranslationsDumper(
             new MessageParametersExtractor(),
@@ -149,7 +151,7 @@ class TranslationsDumperTest extends TestCase
         $this->assertStringNotContainsString('foobar', file_get_contents(self::$translationsDumpDir.'/index.js'));
     }
 
-    public function testDumpIncludedDomains()
+    public function testDumpIncludedDomains(): void
     {
         $translationsDumper = new TranslationsDumper(
             new MessageParametersExtractor(),
@@ -168,7 +170,7 @@ class TranslationsDumperTest extends TestCase
         $this->assertStringNotContainsString('foobar', file_get_contents(self::$translationsDumpDir.'/index.js'));
     }
 
-    public function testSetBothIncludedAndExcludedDomains()
+    public function testSetBothIncludedAndExcludedDomains(): void
     {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('You cannot set both "excluded_domains" and "included_domains" at the same time.');
@@ -188,7 +190,7 @@ class TranslationsDumperTest extends TestCase
         );
     }
 
-    public function testSetBothExcludedAndIncludedDomains()
+    public function testSetBothExcludedAndIncludedDomains(): void
     {
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('You cannot set both "excluded_domains" and "included_domains" at the same time.');
@@ -331,7 +333,7 @@ class TranslationsDumperTest extends TestCase
      * @dataProvider keysPatternProvider
      */
     #[DataProvider('keysPatternProvider')]
-    public function testDumpWithKeysPatterns(array $keysPatterns, callable $assertions)
+    public function testDumpWithKeysPatterns(array $keysPatterns, callable $assertions): void
     {
         $translationsDumper = new TranslationsDumper(
             new MessageParametersExtractor(),
@@ -349,6 +351,31 @@ class TranslationsDumperTest extends TestCase
         $content = file_get_contents(self::$translationsDumpDir.'/index.js');
 
         $assertions($this, $content);
+    }
+
+    public function testDumpParentLocaleFallback(): void
+    {
+        $translator = new Translator('de_AT');
+        $translator->addLoader('array', new ArrayLoader());
+        $translator->addResource('array', ['symfony.great' => 'Symfony ist großartig!'], 'de');
+        $translator->addResource('array', ['symfony.great' => 'Symfony ist leiwand!'], 'de_AT');
+
+        $translationsDumper = new TranslationsDumper(
+            new MessageParametersExtractor(),
+            new IntlMessageParametersExtractor(),
+            new TypeScriptMessageParametersPrinter(),
+            new Filesystem(),
+        );
+
+        $translationsDumper->dump(
+            catalogues: [$translator->getCatalogue('de_AT'), $translator->getCatalogue('de')],
+            dumpDir: self::$translationsDumpDir,
+        );
+
+        $this->assertStringContainsString(
+            'export const localeFallbacks = {"de_AT":"de","de":null};',
+            file_get_contents(self::$translationsDumpDir.'/index.js'),
+        );
     }
 
     /**

@@ -20,6 +20,7 @@ use Symfony\Component\HttpKernel\Kernel as BaseKernel;
 use Symfony\UX\TwigComponent\Tests\Fixtures\Bundle\AcmeBundle\AcmeBundle;
 use Symfony\UX\TwigComponent\Tests\Fixtures\Component\ComponentB;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
+use Twig\Extra\TwigExtraBundle\TwigExtraBundle;
 
 /**
  * @author Kevin Bond <kevinbond@gmail.com>
@@ -33,6 +34,7 @@ final class Kernel extends BaseKernel
         yield new FrameworkBundle();
         yield new TwigBundle();
         yield new TwigComponentBundle();
+        yield new TwigExtraBundle();
         yield new AcmeBundle();
     }
 
@@ -59,24 +61,20 @@ final class Kernel extends BaseKernel
         ]);
 
         $twigComponentConfig = [];
-        if ('legacy_autonaming' != $this->environment) {
-            $acmeDefaults = [
-                'name_prefix' => 'AcmePrefix',
-            ];
-            if ('no_template_directory' !== $this->environment) {
-                $acmeDefaults['template_directory'] = 'acme_components';
-            }
-            $twigComponentConfig['defaults'] = [
-                'Symfony\UX\TwigComponent\Tests\Fixtures\Component\\' => 'components/',
-                'Symfony\UX\TwigComponent\Tests\Fixtures\AcmeComponent\\' => $acmeDefaults,
-            ];
+        $acmeDefaults = [
+            'name_prefix' => 'AcmePrefix',
+        ];
+        if ('no_template_directory' !== $this->environment) {
+            $acmeDefaults['template_directory'] = 'acme_components';
         }
+        $twigComponentConfig['defaults'] = [
+            'Symfony\UX\TwigComponent\Tests\Fixtures\Component\\' => 'components/',
+            'Symfony\UX\TwigComponent\Tests\Fixtures\AcmeComponent\\' => $acmeDefaults,
+        ];
 
-        if ('legacy_anonymous' != $this->environment) {
-            $twigComponentConfig['anonymous_template_directory'] = 'components';
-            if ('anonymous_directory' == $this->environment) {
-                $twigComponentConfig['anonymous_template_directory'] = 'anonymous';
-            }
+        $twigComponentConfig['anonymous_template_directory'] = 'components';
+        if ('anonymous_directory' === $this->environment) {
+            $twigComponentConfig['anonymous_template_directory'] = 'anonymous';
         }
 
         $c->extension('twig_component', $twigComponentConfig);

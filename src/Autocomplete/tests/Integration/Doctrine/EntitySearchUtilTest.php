@@ -26,7 +26,7 @@ class EntitySearchUtilTest extends KernelTestCase
     use Factories;
     use ResetDatabase;
 
-    public function testItCreatesBasicStringSearchQuery()
+    public function testItCreatesBasicStringSearchQuery(): void
     {
         $prod1 = ProductFactory::createOne(['name' => 'bar prod1']);
         $prod2 = ProductFactory::createOne(['name' => 'foo prod2']);
@@ -37,7 +37,7 @@ class EntitySearchUtilTest extends KernelTestCase
         $this->assertSame([$prod1, $prod2, $prod4], $results);
     }
 
-    public function testItSearchesOnCorrectFields()
+    public function testItSearchesOnCorrectFields(): void
     {
         $prod1 = ProductFactory::createOne(['name' => 'bar prod1']);
         ProductFactory::createOne(['description' => 'foo prod2']);
@@ -46,7 +46,7 @@ class EntitySearchUtilTest extends KernelTestCase
         $this->assertSame([$prod1], $results);
     }
 
-    public function testItCanSearchOnRelationFields()
+    public function testItCanSearchOnRelationFields(): void
     {
         $category1 = CategoryFactory::createOne(['name' => 'foods']);
         $category2 = CategoryFactory::createOne(['name' => 'toys']);
@@ -56,6 +56,31 @@ class EntitySearchUtilTest extends KernelTestCase
 
         $results = $this->callAddSearchClass('food', ['name', 'category.name']);
         $this->assertSame([$prod1, $prod2], $results);
+    }
+
+    public function testItEscapesLikeWildcardsInTheQuery(): void
+    {
+        $percent = ProductFactory::createOne(['name' => '100% legit']);
+        $underscore = ProductFactory::createOne(['name' => 'foo_bar']);
+        $backslash = ProductFactory::createOne(['name' => 'a\\b literal']);
+        $bang = ProductFactory::createOne(['name' => 'wow! deal']);
+        ProductFactory::createOne(['name' => 'unrelated thing']);
+
+        // a literal "%" must match only the row that actually contains "%",
+        // not every row (which is what an unescaped LIKE wildcard would do)
+        $this->assertSame([$percent], $this->callAddSearchClass('%'));
+
+        // same for "_"
+        $this->assertSame([$underscore], $this->callAddSearchClass('_'));
+
+        // a literal "\" must be treated as data, not as the LIKE escape char
+        $this->assertSame([$backslash], $this->callAddSearchClass('a\\b'));
+
+        // the LIKE escape char itself ("!") must be treated as data
+        $this->assertSame([$bang], $this->callAddSearchClass('wow!'));
+
+        // a normal substring search still works
+        $this->assertSame([$percent], $this->callAddSearchClass('legit'));
     }
 
     /**

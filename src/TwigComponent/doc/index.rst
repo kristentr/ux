@@ -299,6 +299,9 @@ prefix the attribute with ``:`` or use the normal ``{{ }}`` syntax:
     // pass object, array, or anything you imagine
     <twig:Alert :foo="{col: ['foo', 'oof']}" />
 
+    // null-safe operator (Twig 3.23+)
+    <twig:Alert :title="user.profile?.displayName" />
+
 Boolean props are converted using PHP's type juggling rules. The
 string ``"false"`` is converted to the boolean ``true``.
 
@@ -384,10 +387,6 @@ use the full path of the template where the macro is defined:
 
 Dynamic Templates
 -----------------
-
-.. versionadded:: 2.33
-
-    The ability to dynamically resolve templates via the ``FromMethod`` attribute was added.
 
 Sometimes, you need to render a different template based on the component state.
 
@@ -856,6 +855,46 @@ There is also a non-HTML syntax that can be used:
         {% block footer %}... footer content{% endblock %}
     {% endcomponent %}
 
+.. versionadded:: 3.4
+
+    Support for dynamic component names was added in TwigComponent 3.4.
+
+The ``{% component %}`` tag also accepts dynamic expressions, but they must be
+wrapped in parentheses. Without parentheses, the value is treated as the
+literal component name:
+
+.. code-block:: twig
+
+    {% set prefix = 'DynamicNameComponent' %}
+    {% for i in 1..2 %}
+        {% component (prefix ~ i) %}{% endcomponent %}
+    {% endfor %}
+
+.. versionadded:: 3.5
+
+    Support for dynamic component names in the HTML syntax was added in TwigComponent 3.5.
+
+With the HTML syntax, use the ``<twig:component>`` tag with
+the ``is`` attribute:
+
+.. code-block:: html+twig
+
+    <twig:component is="Alert" type="success" />
+
+    {# Dynamic component name #}
+    <twig:component is="{{ componentName }}" type="success" />
+
+    {# Dynamic with content #}
+    <twig:component is="{{ componentName }}" type="success">
+        Content here
+    </twig:component>
+
+    {# Dynamic in a loop #}
+    {% set prefix = 'DynamicNameComponent' %}
+    {% for i in 1..2 %}
+        <twig:component is="{{ prefix ~ i }}" />
+    {% endfor %}
+
 .. _embedded-components-context:
 
 Context / Variables Inside of Blocks
@@ -941,11 +980,6 @@ components, that can be done via the ``outerScope...`` variable:
 
         {{ outerScope.this.someProp }} {# references a "someProp" prop from SuccessAlert #}
     {% endcomponent %}
-
-.. versionadded:: 2.13
-
-    The ability to refer to the scope of higher components via the ``outerScope``
-    variable was added in 2.13.
 
 You can keep referring to components higher up as well. Just add another ``outerScope``.
 Remember though that the ``outerScope`` reference only starts once you're INSIDE the (embedded) component.
@@ -1128,10 +1162,6 @@ the exception of *class*. For ``class``, the defaults are prepended:
 Render
 ~~~~~~
 
-.. versionadded:: 2.15
-
-    The ability to *render* attributes was added in TwigComponents 2.15.
-
 You can take full control over the attributes that are rendered by using the
 ``render()`` method.
 
@@ -1241,10 +1271,6 @@ Exclude specific attributes:
 Nested Attributes
 ~~~~~~~~~~~~~~~~~
 
-.. versionadded:: 2.17
-
-    The Nested Attributes feature was added in TwigComponents 2.17.
-
 You can have attributes that aren't meant to be used on the *root* element
 but one of its *descendants*. This is useful for, say, a dialog component where
 you want to allow customizing the attributes of the dialog's content, title,
@@ -1295,58 +1321,41 @@ The nesting is recursive so you could potentially do something like this:
         row:widget:class="ui-form-widget"
     />
 
-Component with Complex Variants (CVA)
--------------------------------------
+Class Variant Authority
+-----------------------
 
-.. deprecated:: 2.20
-
-    The ``cva`` function was deprecated in TwigComponents 2.20, and will be
-    removed in 3.0. The function is now provided by the ``twig/html-extra:^3.12``
-    package under the name `html_cva`_.
-
-`CVA (Class Variant Authority)`_ originates from the JavaScript ecosystem. It
-enables reusable, customizable components by managing variants (e.g., color, size).
-The ``cva()`` Twig function defines ``base`` classes (always applied) and variant-specific
-classes:
+`CVA (Class Variant Authority)`_ originates from the JavaScript ecosystem.
+It enables reusable, customizable components by managing variants (e.g., color, size).
+The `html_cva()`_ Twig function from ``twig/html-extra:^3.12`` defines ``base`` classes (always applied)
+and variant-specific classes:
 
 .. code-block:: html+twig
 
-    {# templates/components/Alert.html.twig #}
-    {% props color = 'blue', size = 'md' %}
-
-     {% set alert = cva({
-        base: 'alert',
+    {% set button = html_cva(
+        base: 'btn',
         variants: {
-            color: {
-                blue: 'bg-blue',
-                red: 'bg-red',
-                green: 'bg-green',
-            },
-            size: {
-                sm: 'text-sm',
-                md: 'text-md',
-                lg: 'text-lg',
-            }
-        }
-    }) %}
+            color: { primary: 'btn-primary', secondary: 'btn-secondary' },
+            size: { sm: 'btn-sm', md: 'btn-md', lg: 'btn-lg' }
+        },
+        default_variant: { color: 'primary', size: 'md' }
+    ) %}
 
-    <div class="{{ alert.apply({color, size}, attributes.render('class')) }}">
-         {% block content %}{% endblock %}
-    </div>
+    <button class="{{ button.apply({color, size}, attributes.render('class')) }}">
+        {% block content %}{% endblock %}
+    </button>
 
-Then use the ``color`` and ``size`` variants to select the classes needed:
+When rendering the component, pass the desired variants:
 
 .. code-block:: html+twig
 
-    <twig:Alert color="green" size="sm">
-        ...
-    </twig:Alert>
+    {# renders as: <button class="btn btn-primary btn-md">... #}
+    <twig:Button>Click Me!</twig:Button>
 
-    {# will render as: #}
+    {# renders as: <button class="btn btn-secondary btn-lg">... #}
+    <twig:Button color="secondary" size="lg">Click Me!</twig:Button>
 
-     <div class="alert bg-green text-sm">
-        ...
-    </div>
+    {# renders as: <button class="btn btn-primary btn-sm custom-class">... #}
+    <twig:Button size="sm" class="custom-class">Click Me!</twig:Button>
 
 CVA and Tailwind CSS
 ~~~~~~~~~~~~~~~~~~~~
@@ -1357,84 +1366,79 @@ to resolve conflicts:
 
 .. code-block:: html+twig
 
-    <div class="{{ alert.apply({color, size}, attributes.render('class'))|tailwind_merge }}">
+    <div class="{{ button.apply({color, size}, attributes.render('class'))|tailwind_merge }}">
         {% block content %}{% endblock %}
     </div>
 
-Compound Variants
-~~~~~~~~~~~~~~~~~
+Sharing State With ``provide`` / ``inject``
+-------------------------------------------
 
-Define compound variants for conditions involving multiple variants:
+When a component is made of several pieces, descendants often need values
+declared on the root. Forwarding those values through every level as props
+gets tedious fast. Use ``provide()`` in the parent to publish a value, and
+``inject()`` in any descendant to read it.
 
-.. code-block:: html+twig
-
-    {# templates/components/Alert.html.twig #}
-    {% props color = 'blue', size = 'md' %}
-
-    {% set alert = cva({
-        base: 'alert',
-        variants: {
-           color: { red: 'bg-red' },
-           size: { lg: 'text-lg' }
-        },
-        compoundVariants: [{
-            color: ['red'],
-            size: ['lg'],
-            class: 'font-bold'
-        }]
-    }) %}
-
-    <div class="{{ alert.apply({color, size}) }}">
-         {% block content %}{% endblock %}
-    </div>
-
-    {# index.html.twig #}
-
-    <twig:Alert color="red" size="lg">
-        ...
-    </twig:Alert>
-
-    {# will render as: #}
-
-    <div class="alert bg-red text-lg font-bold">
-        ...
-    </div>
-
-Default Variants
-~~~~~~~~~~~~~~~~
-
-If no variants match, you can define a default set of classes to apply:
+In the parent, publish values with ``provide()``:
 
 .. code-block:: html+twig
 
-    {# templates/components/Alert.html.twig #}
-    {% set alert = cva({
-        base: 'alert',
-        variants: {
-            color: {
-                red: 'bg-red'
-            },
-            rounded: {
-                sm: 'rounded-sm',
-                md: 'rounded-md'
-            }
-        },
-        defaultVariants: {
-            rounded: 'md'
-        }
-    }) %}
+    {# templates/components/InputOtp.html.twig #}
+    {% props maxLength = 6 %}
 
-    {# index.html.twig #}
+    {% do provide('inputOtp.maxLength', maxLength) %}
 
-    <twig:Alert color="red">
-        ...
-    </twig:Alert>
-
-    {# will render as: #}
-
-    <div class="alert bg-red rounded-md">
-        ...
+    <div class="input-otp">
+        {% block content %}{% endblock %}
     </div>
+
+In any descendant (at any depth), read them with ``inject()```:
+
+.. code-block:: html+twig
+
+    {# templates/components/InputOtp/Slot.html.twig #}
+    {% props input %}
+
+    {# Fallback to 4 if the parent doesn't provide a value for some reason #}
+    {% set maxLength = inject('inputOtp.maxLength', 4) %}
+
+    <input type="text" maxlength="1" data-index="{{ input }}" data-max-length="{{ maxLength }}" />
+
+Here, ``Slot`` reads ``maxLength`` from ``InputOtp`` even though ``Group``
+sits in between and does not forward anything:
+
+.. code-block:: html+twig
+
+    <twig:InputOtp maxLength="6">
+        <twig:InputOtp:Group>
+            {% for i in 0..5 %}
+                <twig:InputOtp:Slot input="{{ i + 1 }}" />
+            {% endfor %}
+        </twig:InputOtp:Group>
+    </twig:InputOtp>
+
+Keys are arbitrary strings; values can be any type, including ``null``.
+Prefix keys with the component name (``'inputOtp.maxLength'``,
+``'tabs.active'``) to avoid collisions across unrelated components.
+
+Rules:
+
+- Values flow top-down only. A child cannot push values back up.
+- ``inject()`` walks ancestors nearest-first, and skips the current
+  component. Read your own state through local variables.
+- Once a parent finishes rendering, its provides are dropped. Sibling
+  components never share state.
+- Calling ``provide()`` outside a component template throws.
+
+.. warning::
+
+    ``provide()`` runs at render time. A descendant only sees a value if
+    the corresponding ``provide()`` call executed first. Place
+    ``provide()`` at the top of the parent template, before
+    ``{% block content %}``. If the same key is provided twice, the last
+    call wins.
+
+This complements :ref:`outerScope <embedded-components-outerScope>`, which
+only exposes the immediate parent's local context.
 
 Higher-Order Components (Component Wrappers)
 --------------------------------------------
@@ -1854,10 +1858,6 @@ components into their projects.
 Anonymous Components
 ~~~~~~~~~~~~~~~~~~~~
 
-.. versionadded:: 2.20
-
-    The bundle convention for Anonymous components was added in TwigComponents 2.20.
-
 Using a component from a third-party bundle is just as straightforward as using
 one from your own application. Once the bundle is installed and configured, you
 can reference its components directly within your Twig templates:
@@ -1984,8 +1984,8 @@ Debugging Components
 
 As your application grows, you'll eventually have a lot of components.
 This command will help you to debug some components issues.
-First, the debug:twig-component command lists all your application components
-that live in ``templates/components/``:
+First, the ``debug:twig-component`` command lists all your application
+components that live in ``templates/components/``:
 
 .. code-block:: terminal
 
@@ -2042,7 +2042,7 @@ https://symfony.com/doc/current/contributing/code/bc.html
 .. _`Passing Blocks to Live Components`: https://symfony.com/bundles/ux-live-component/current/index.html#passing-blocks
 .. _`Stimulus controller`: https://symfony.com/bundles/StimulusBundle/current/index.html
 .. _`CVA (Class Variant Authority)`: https://cva.style/docs/getting-started/variants
-.. _`html_cva`: https://twig.symfony.com/doc/3.x/functions/html_cva.html
+.. _`html_cva()`: https://twig.symfony.com/doc/3.x/functions/html_cva.html
 .. _`tales-from-a-dev/twig-tailwind-extra`: https://github.com/tales-from-a-dev/twig-tailwind-extra
 .. _`ignore not defined options`: https://symfony.com/doc/current/components/options_resolver.html#ignore-not-defined-options
 .. _`Symfony MakerBundle`: https://symfony.com/bundles/SymfonyMakerBundle/current/index.html

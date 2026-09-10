@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\TwigComponent\Tests\Integration\Test;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\UX\TwigComponent\Test\InteractsWithTwigComponents;
 use Symfony\UX\TwigComponent\Tests\Fixtures\Component\ComponentA;
@@ -21,10 +22,8 @@ final class InteractsWithTwigComponentsTest extends KernelTestCase
 {
     use InteractsWithTwigComponents;
 
-    /**
-     * @dataProvider componentANameProvider
-     */
-    public function testCanMountComponent(string $name)
+    #[DataProvider('componentANameProvider')]
+    public function testCanMountComponent(string $name): void
     {
         $component = $this->mountTwigComponent($name, [
             'propA' => 'prop a value',
@@ -37,10 +36,8 @@ final class InteractsWithTwigComponentsTest extends KernelTestCase
         $this->assertSame('prop b value', $component->getPropB());
     }
 
-    /**
-     * @dataProvider componentANameProvider
-     */
-    public function testCanRenderComponent(string $name)
+    #[DataProvider('componentANameProvider')]
+    public function testCanRenderComponent(string $name): void
     {
         $rendered = $this->renderTwigComponent($name, [
             'propA' => 'prop a value',
@@ -53,10 +50,8 @@ final class InteractsWithTwigComponentsTest extends KernelTestCase
         $this->assertCount(2, $rendered->crawler()->filter('ul li'));
     }
 
-    /**
-     * @dataProvider withSlotsNameProvider
-     */
-    public function testCanRenderComponentWithSlots(string $name)
+    #[DataProvider('withSlotsNameProvider')]
+    public function testCanRenderComponentWithSlots(string $name): void
     {
         $rendered = $this->renderTwigComponent(
             name: $name,

@@ -20,7 +20,7 @@ use Symfony\UX\Toolkit\Recipe\RecipeType;
 
 final class KitTest extends TestCase
 {
-    public function testShouldFailIfKitNameIsInvalid()
+    public function testShouldFailIfKitNameIsInvalid(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid kit name "-foobar".');
@@ -28,7 +28,7 @@ final class KitTest extends TestCase
         new Kit(__DIR__, new KitManifest('-foobar', 'Description', 'MIT', 'https://example.com'));
     }
 
-    public function testShouldFailIfKitPathIsNotAbsolute()
+    public function testShouldFailIfKitPathIsNotAbsolute(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(\sprintf('Kit path "./%s" is not absolute.', __DIR__));
@@ -36,23 +36,23 @@ final class KitTest extends TestCase
         new Kit(\sprintf('./%s', __DIR__), new KitManifest('foo', 'Description', 'MIT', 'https://example.com'));
     }
 
-    public function testCanAddRecipesToTheKit()
+    public function testCanAddRecipesToTheKit(): void
     {
         $kit = new Kit(__DIR__, new KitManifest('foo', 'Description', 'MIT', 'https://example.com'));
         $kit->addRecipe(new Recipe(
             'alert',
             __DIR__.'/alert',
-            new RecipeManifest(RecipeType::Component, 'Alert', 'Description', []),
+            new RecipeManifest(RecipeType::Component, 'Alert', []),
         ));
         $kit->addRecipe(new Recipe(
             'table',
             __DIR__.'/table',
-            new RecipeManifest(RecipeType::Component, 'Table', 'Description', []),
+            new RecipeManifest(RecipeType::Component, 'Table', []),
         ));
         $kit->addRecipe(new Recipe(
             'login',
             __DIR__.'/Login',
-            new RecipeManifest(RecipeType::Block, 'Login', 'Description', []),
+            new RecipeManifest(RecipeType::Block, 'Login', []),
         ));
 
         $this->assertCount(3, $kit->getRecipes());
@@ -60,7 +60,7 @@ final class KitTest extends TestCase
         $this->assertCount(1, $kit->getRecipes(type: RecipeType::Block));
     }
 
-    public function testShouldFailIfComponentIsAlreadyRegisteredInTheKit()
+    public function testShouldFailIfComponentIsAlreadyRegisteredInTheKit(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Recipe "Alert" is already registered in the kit.');
@@ -69,34 +69,34 @@ final class KitTest extends TestCase
         $kit->addRecipe(new Recipe(
             'alert',
             __DIR__.'/alert',
-            new RecipeManifest(RecipeType::Component, 'Alert', 'Description', []),
+            new RecipeManifest(RecipeType::Component, 'Alert', []),
         ));
         $kit->addRecipe(new Recipe(
             'alert',
             __DIR__.'/alert',
-            new RecipeManifest(RecipeType::Component, 'Alert', 'Description', []),
+            new RecipeManifest(RecipeType::Component, 'Alert', []),
         ));
     }
 
-    public function testCanGetRecipeByName()
+    public function testCanGetRecipeByName(): void
     {
         $kit = new Kit(__DIR__, new KitManifest('foo', 'Description', 'MIT', 'https://example.com'));
         $kit->addRecipe(new Recipe(
             'alert',
             __DIR__.'/Alert',
-            new RecipeManifest(RecipeType::Component, 'Alert', 'Description', []),
+            new RecipeManifest(RecipeType::Component, 'Alert', []),
         ));
         $kit->addRecipe(new Recipe(
             'table',
             __DIR__.'/Table',
-            new RecipeManifest(RecipeType::Component, 'Table', 'Description', []),
+            new RecipeManifest(RecipeType::Component, 'Table', []),
         ));
 
         $this->assertSame('Table', $kit->getRecipe('table')->manifest->name);
         $this->assertSame('Alert', $kit->getRecipe('alert')->manifest->name);
     }
 
-    public function testShouldReturnNullIfRecipeIsNotFound()
+    public function testShouldReturnNullIfRecipeIsNotFound(): void
     {
         $kit = new Kit(__DIR__, new KitManifest('foo', 'Description', 'MIT', 'https://example.com'));
 

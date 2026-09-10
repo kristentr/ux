@@ -1,0 +1,19 @@
+{# @prop as string The item tag. #}
+{# @block content The item label. #}
+
+{%- props as = 'a' -%}
+
+{% set _attributes_defaults = {} %}
+{% if as == 'button' %}
+    {% set _attributes_defaults = {type: 'button'} %}
+{% endif %}
+
+<li role="none">
+    <{{ as }}
+        role="menuitem"
+        tabindex="-1"
+        {{ attributes.defaults(_attributes_defaults).defaults({class: 'inline-flex items-center w-full p-2 text-sm font-medium text-body hover:bg-neutral-tertiary-medium hover:text-heading rounded'|tailwind_classes}) }}
+    >
+        {%- block content %}{% endblock -%}
+    </{{ as }}>
+</li>

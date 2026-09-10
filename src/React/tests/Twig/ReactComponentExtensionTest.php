@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\React\Tests\Twig;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\React\Tests\Kernel\TwigAppKernel;
 use Symfony\UX\React\Twig\ReactComponentExtension;
@@ -22,7 +23,7 @@ use Symfony\UX\React\Twig\ReactComponentExtension;
  */
 class ReactComponentExtensionTest extends TestCase
 {
-    public function testRenderComponent()
+    public function testRenderComponent(): void
     {
         $kernel = new TwigAppKernel('test', true);
         $kernel->boot();
@@ -41,10 +42,8 @@ class ReactComponentExtensionTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider provideOptions
-     */
-    public function testRenderComponentWithOptions(array $options, string|false $expected)
+    #[DataProvider('provideOptions')]
+    public function testRenderComponentWithOptions(array $options, string|false $expected): void
     {
         $kernel = new TwigAppKernel('test', true);
         $kernel->boot();
@@ -74,7 +73,7 @@ class ReactComponentExtensionTest extends TestCase
         yield 'no permanent' => [[], false];
     }
 
-    public function testRenderComponentWithoutProps()
+    public function testRenderComponentWithoutProps(): void
     {
         $kernel = new TwigAppKernel('test', true);
         $kernel->boot();

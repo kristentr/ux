@@ -92,16 +92,24 @@ class InstallCommand extends Command
 
         // If the kit name is not explicitly provided, we need to suggest one
         if (null === $kitName) {
+            /** @var list<Kit> $kits */
+            $kits = [];
+            foreach (LocalRegistry::getAvailableKitsName() as $availableKitName) {
+                $kits[] = $this->registryFactory->getForKit($availableKitName)->getKit($availableKitName);
+            }
+
             /** @var list<Kit> $availableKits */
             $availableKits = [];
-            $availableKitNames = LocalRegistry::getAvailableKitsName();
-            foreach ($availableKitNames as $availableKitName) {
-                $kit = $this->registryFactory->getForKit($availableKitName)->getKit($availableKitName);
-
-                if (null === $recipeName) {
-                    $availableKits[] = $kit;
-                } elseif (null !== $kit->getRecipe(name: $recipeName)) {
-                    $availableKits[] = $kit;
+            if (null === $recipeName) {
+                $availableKits = $kits;
+            } else {
+                // Recipe names are stored in lower-case, so we match them case-insensitively
+                // (e.g. "Alert" resolves to the "alert" recipe) and keep the canonical name.
+                foreach ($kits as $kit) {
+                    if (null !== $recipe = $this->findRecipeIgnoringCase($kit, $recipeName)) {
+                        $availableKits[] = $kit;
+                        $recipeName = $recipe->name;
+                    }
                 }
             }
             // If more than one kit is available, we ask the user which one to use
@@ -119,9 +127,24 @@ class InstallCommand extends Command
             } else {
                 if (null === $recipeName) {
                     $io->error('It seems that no official kits are available and it should not happens. Please open an issue on https://github.com/symfony/ux to report this.');
+
+                    return Command::FAILURE;
+                }
+
+                // Suggest close recipes found across all official kits.
+                $alternativeRecipes = [];
+                foreach ($kits as $kit) {
+                    foreach ($this->getAlternativeRecipes($kit, $recipeName) as $alternativeRecipe) {
+                        $alternativeRecipes[$alternativeRecipe->name] = $alternativeRecipe;
+                    }
+                }
+                ksort($alternativeRecipes);
+
+                $message = \sprintf('The recipe "%s" does not exist in any official kit.', $recipeName);
+                if ([] !== $alternativeRecipes) {
+                    $io->warning(\sprintf('%s'."\n".'Possible alternatives: "%s". You can install one of them with: %s <recipe>', $message, implode('", "', array_keys($alternativeRecipes)), $this->getName()));
                 } else {
-                    $io->error(\sprintf('The recipe "%s" does not exist in any official kits.', $recipeName));
-                    // $io->error(\sprintf("The recipe \"%s\" does not exist in any official kits.\n\nYou can try to run one of the following commands to interactively install recipes:\n%s\n\nOr you can try one of the community kits https://github.com/search?q=topic:ux-toolkit&type=repositories", $recipeName, implode("\n", array_map(fn (string $availableKitName) => \sprintf('$ bin/console %s --kit %s', $this->getName(), $availableKitName), $availableKitNames))));
+                    $io->error($message);
                 }
 
                 return Command::FAILURE;
@@ -135,7 +158,7 @@ class InstallCommand extends Command
             // Ask for the recipe name if not provided
             $recipeName = $io->choice('Which recipe do you want to install?', array_map(static fn (Recipe $recipe) => $recipe->manifest->name, $kit->getRecipes()));
             $recipe = $kit->getRecipe(name: $recipeName);
-        } elseif (null === $recipe = $kit->getRecipe($recipeName)) {
+        } elseif (null === $recipe = $this->findRecipeIgnoringCase($kit, $recipeName)) {
             // Suggest alternatives if recipe does not exist
             $message = \sprintf('The recipe "%s" does not exist.', $recipeName);
 
@@ -174,7 +197,7 @@ class InstallCommand extends Command
         $this->io->success('The recipe has been installed.');
 
         $this->io->section('Installed files');
-        $this->io->listing(array_map(static fn (File $file) => Path::join($destinationPath, $file->sourceRelativePathName), $installationReport->newFiles));
+        $this->io->listing(array_map(static fn (File $file) => Path::join($destinationPath, $file->destinationRelativePathName), $installationReport->newFiles));
 
         if ([] !== $installationReport->suggestedPhpPackages || [] !== $installationReport->suggestedNpmPackages || [] !== $installationReport->suggestedImportmapPackages) {
             $this->io->section('Next steps');
@@ -195,7 +218,7 @@ class InstallCommand extends Command
             $this->io->writeln(\sprintf(' $ <info>npm install --save %s</>', implode(' ', $installationReport->suggestedNpmPackages)));
             $this->io->newLine();
             $this->io->writeln(' # or with Importmap');
-            $this->io->writeln(\sprintf(' $ <info>php bin/console importmap:install %s</>', implode(' ', $installationReport->suggestedImportmapPackages)));
+            $this->io->writeln(\sprintf(' $ <info>php bin/console importmap:require %s</>', implode(' ', $installationReport->suggestedImportmapPackages)));
             $this->io->newLine();
         } elseif ([] !== $installationReport->suggestedNpmPackages) {
             $this->io->writeln(++$stepIndex.'. Install suggested front-end package(s) with the command:');
@@ -205,11 +228,26 @@ class InstallCommand extends Command
         } elseif ([] !== $installationReport->suggestedImportmapPackages) {
             $this->io->writeln(++$stepIndex.'. Install suggested front-end package(s) with the command:');
             $this->io->newLine();
-            $this->io->writeln(\sprintf(' $ <info>php bin/console importmap:install %s</>', implode(' ', $installationReport->suggestedImportmapPackages)));
+            $this->io->writeln(\sprintf(' $ <info>php bin/console importmap:require %s</>', implode(' ', $installationReport->suggestedImportmapPackages)));
             $this->io->newLine();
         }
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Recipe names are stored in lower-case, so we resolve them case-insensitively
+     * (e.g. "Alert" resolves to the "alert" recipe).
+     */
+    private function findRecipeIgnoringCase(Kit $kit, string $recipeName): ?Recipe
+    {
+        foreach ($kit->getRecipes() as $recipe) {
+            if (0 === strcasecmp($recipe->name, $recipeName)) {
+                return $recipe;
+            }
+        }
+
+        return null;
     }
 
     /**

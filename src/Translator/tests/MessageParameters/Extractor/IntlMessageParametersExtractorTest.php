@@ -11,15 +11,14 @@
 
 namespace Symfony\UX\Translator\Tests\MessageParameters;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Translator\MessageParameters\Extractor\IntlMessageParametersExtractor;
 
 class IntlMessageParametersExtractorTest extends TestCase
 {
-    /**
-     * @dataProvider provideExtract
-     */
-    public function testExtract(string $message, array $expectedParameters)
+    #[DataProvider('provideExtract')]
+    public function testExtract(string $message, array $expectedParameters): void
     {
         $intlMessageParametersExtractor = new IntlMessageParametersExtractor();
 

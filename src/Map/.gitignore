@@ -1,4 +1,7 @@
+/assets/node_modules/
 /config/reference.php
-/vendor
+/config/schema.json
+/vendor/
 /composer.lock
-/.phpunit.result.cache
+/phpunit.xml
+/.phpunit.cache

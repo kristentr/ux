@@ -24,19 +24,29 @@ class ExampleRepository
     public function __construct()
     {
         $this->examples = [
+            new Example(UxPackage::Autocomplete, 'Autocomplete (with AJAX)', 'An autocomplete form field, by fetching results with AJAX.', 'app_ux_autocomplete_with_ajax'),
             new Example(UxPackage::Autocomplete, 'Autocomplete (without AJAX)', 'An autocomplete form field, by using the choses from the choice type field.', 'app_ux_autocomplete_without_ajax'),
             new Example(UxPackage::Autocomplete, 'Autocomplete (custom controller)', 'An autocomplete form field, with a custom Stimulus controller for AJAX results.', 'app_ux_autocomplete_custom_controller'),
+            new Example(UxPackage::CalendarLink, 'Basic event', 'A simple calendar event with a title, dates, description and location, rendered as links for Google, Outlook, Office 365 and iCalendar.', 'app_ux_calendar_link_basic'),
+            new Example(UxPackage::CalendarLink, 'All-day event', 'An all-day calendar event rendered as links across providers.', 'app_ux_calendar_link_all_day'),
+            new Example(UxPackage::CalendarLink, 'Recurring event', 'A recurring calendar event (daily, 5 occurrences) — only Google and the iCalendar file expose the recurrence.', 'app_ux_calendar_link_recurrence'),
+            new Example(UxPackage::CalendarLink, 'Event with reminders', 'A calendar event with two reminders (15 minutes and 1 hour before), exposed in the iCalendar file as VALARM blocks.', 'app_ux_calendar_link_reminders'),
             new Example(UxPackage::ChartJs, 'Line chart without options', 'A basic line chart displaying monthly data without additional options.', 'app_ux_chartjs_without_options'),
             new Example(UxPackage::ChartJs, 'Line chart with options', 'A line chart with custom options (showLines: false) that displays data points without connecting lines.', 'app_ux_chartjs_with_options'),
             new Example(UxPackage::ChartJs, 'Pie chart', 'A pie chart displaying data distribution across different categories.', 'app_ux_chartjs_pie'),
             new Example(UxPackage::ChartJs, 'Pie chart with options', 'A pie chart with custom options to control the appearance and behavior.', 'app_ux_chartjs_pie_with_options'),
             new Example(UxPackage::Cropperjs, 'Image cropper', 'Crop an image with Cropper.js using default options.', 'app_ux_cropperjs_crop'),
             new Example(UxPackage::Cropperjs, 'Image cropper with aspect ratio', 'Crop an image with a fixed 16:9 aspect ratio constraint.', 'app_ux_cropperjs_crop_with_aspect_ratio'),
+            new Example(UxPackage::Dropzone, 'Single file upload', 'Upload one file, with a preview and a clear button.', 'app_ux_dropzone_single'),
+            new Example(UxPackage::Dropzone, 'Multiple file upload', 'Upload several files at once: accumulate across picks, preview each, and remove individually.', 'app_ux_dropzone_multiple'),
             new Example(UxPackage::LiveComponent, 'Examples filtering', 'On this page, you can filter all examples by query terms, and observe how the UI and URLs update during and after processing.', 'app_home'),
             new Example(UxPackage::LiveComponent, 'Counter', 'A basic counter that you can increment or decrement.', 'app_ux_live_component_counter'),
             new Example(UxPackage::Turbo, 'Turbo Drive navigation', 'Navigate between pages without full page reload using Turbo Drive.', 'app_ux_turbo_drive'),
             new Example(UxPackage::Turbo, 'Turbo Frame', 'A scoped section that navigates independently from the rest of the page.', 'app_ux_turbo_frame'),
             new Example(UxPackage::Turbo, 'Turbo Stream after form submit', 'Update page content with Turbo Streams after a form submission.', 'app_ux_turbo_stream'),
+            new Example(UxPackage::Turbo, 'Turbo Broadcast — Books', 'Create, update and remove a Doctrine entity, broadcasted to all clients via Mercure.', 'app_ux_turbo_broadcast_books'),
+            new Example(UxPackage::Turbo, 'Turbo Broadcast — Artists & Songs', 'Broadcast updates using Expression Language topics, scoped per artist.', 'app_ux_turbo_broadcast_artists'),
+            new Example(UxPackage::Turbo, 'Turbo Broadcast — Artist via Song', 'Broadcast updates of a Doctrine entity stored as a Proxy.', 'app_ux_turbo_broadcast_artist_from_song'),
             new Example(UxPackage::LiveComponent, 'Registration form', 'A registration form with live validation using Symfony Forms and the Validator component.', 'app_ux_live_component_registration_form'),
             new Example(UxPackage::LiveComponent, 'Paginated fruits list', 'A paginated list of fruits, where the current page is persisted in the URL as a path parameter.', 'app_ux_live_component_fruits'),
             new Example(UxPackage::LiveComponent, 'With DTO', 'A live component that uses a DTO to encapsulate its state.', 'app_ux_live_component_with_dto'),
@@ -65,7 +75,6 @@ class ExampleRepository
             new Example(UxPackage::Map, 'With rectangles (Leaflet)', 'A map with two rectangles: one from Paris to Lille, the other from Lyon to Bordeaux', 'app_ux_map_with_rectangles', ['renderer' => 'leaflet']),
             new Example(UxPackage::Map, 'With rectangles (Google)', 'A map with two rectangles: one from Paris to Lille, the other from Lyon to Bordeaux', 'app_ux_map_with_rectangles', ['renderer' => 'google']),
             new Example(UxPackage::React, 'Basic React Component', 'A basic React component that displays a welcoming message', 'app_ux_react_index'),
-            new Example(UxPackage::Svelte, 'Basic Svelte Component', 'A basic Svelte component that displays a welcoming message', 'app_ux_svelte_index'),
             new Example(UxPackage::Translator, 'Basic translation', 'A simple translation example using the Translator component', 'app_ux_translator_basic'),
             new Example(UxPackage::Translator, 'Translation with parameter', 'Translation example with dynamic parameters', 'app_ux_translator_with_parameter'),
             new Example(UxPackage::Translator, 'ICU Translation with `select` argument', 'ICU message format example using the `select` argument', 'app_ux_translator_icu_select'),
@@ -110,12 +119,11 @@ class ExampleRepository
 
     public function findOneByRoute(string $routeName): ?Example
     {
-        foreach ($this->examples as $example) {
-            if ($example->routeName === $routeName) {
-                return $example;
-            }
-        }
+        return array_find($this->examples, static fn ($example) => $example->routeName === $routeName);
+    }
 
-        return null;
+    public function findOneByName(string $name): ?Example
+    {
+        return array_find($this->examples, static fn ($example) => $example->name === $name);
     }
 }

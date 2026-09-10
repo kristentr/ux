@@ -16,9 +16,11 @@ use Symfony\UX\Icons\Command\LockIconsCommand;
 use Symfony\UX\Icons\Command\SearchIconCommand;
 use Symfony\UX\Icons\Command\WarmCacheCommand;
 use Symfony\UX\Icons\IconCacheWarmer;
+use Symfony\UX\Icons\IconFactory;
 use Symfony\UX\Icons\Iconify;
 use Symfony\UX\Icons\IconRenderer;
 use Symfony\UX\Icons\IconRendererInterface;
+use Symfony\UX\Icons\Registry\AutoLockIconRegistry;
 use Symfony\UX\Icons\Registry\CacheIconRegistry;
 use Symfony\UX\Icons\Registry\ChainIconRegistry;
 use Symfony\UX\Icons\Registry\IconifyOnDemandRegistry;
@@ -40,8 +42,11 @@ return static function (ContainerConfigurator $container): void {
                 service('.ux_icons.cache'),
             ])
 
+        ->set('.ux_icons.icon_factory', IconFactory::class)
+
         ->set('.ux_icons.local_svg_icon_registry', LocalSvgIconRegistry::class)
             ->args([
+                service('.ux_icons.icon_factory'),
                 abstract_arg('icon_dir'),
             ])
             ->tag('ux_icons.registry', ['priority' => 10])
@@ -97,6 +102,7 @@ return static function (ContainerConfigurator $container): void {
         ->set('.ux_icons.iconify', Iconify::class)
             ->args([
                 service('.ux_icons.cache'),
+                service('.ux_icons.icon_factory'),
                 abstract_arg('endpoint'),
                 service('http_client')->nullOnInvalid(),
             ])
@@ -106,6 +112,13 @@ return static function (ContainerConfigurator $container): void {
                 service('.ux_icons.iconify'),
             ])
             ->tag('ux_icons.registry', ['priority' => -10])
+
+        ->set('.ux_icons.auto_lock_icon_registry', AutoLockIconRegistry::class)
+            ->args([
+                service('.ux_icons.iconify_on_demand_registry'),
+                service('.ux_icons.local_svg_icon_registry'),
+                service('logger')->ignoreOnInvalid(),
+            ])
 
         ->set('.ux_icons.command.import', ImportIconCommand::class)
             ->args([

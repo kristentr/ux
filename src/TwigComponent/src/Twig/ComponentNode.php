@@ -15,8 +15,9 @@ use Symfony\UX\TwigComponent\BlockStack;
 use Twig\Attribute\YieldReady;
 use Twig\Compiler;
 use Twig\Environment;
-use Twig\Extension\CoreExtension;
+use Twig\Error\SyntaxError;
 use Twig\Node\Expression\AbstractExpression;
+use Twig\Node\Expression\NameExpression;
 use Twig\Node\Node;
 use Twig\Node\NodeOutputInterface;
 use Twig\Template;
@@ -30,9 +31,9 @@ use Twig\Template;
 #[YieldReady]
 final class ComponentNode extends Node implements NodeOutputInterface
 {
-    public function __construct(string $component, string $embeddedTemplateName, int $embeddedTemplateIndex, ?AbstractExpression $props, bool $only, int $lineno)
+    public function __construct(AbstractExpression $component, string $embeddedTemplateName, int $embeddedTemplateIndex, ?AbstractExpression $props, bool $only, int $lineno)
     {
-        $nodes = [];
+        $nodes = ['component' => $component];
         if (null !== $props) {
             $nodes['props'] = $props;
         }
@@ -42,7 +43,6 @@ final class ComponentNode extends Node implements NodeOutputInterface
         $this->setAttribute('only', $only);
         $this->setAttribute('embedded_template', $embeddedTemplateName);
         $this->setAttribute('embedded_index', $embeddedTemplateIndex);
-        $this->setAttribute('component', $component);
     }
 
     public function compile(Compiler $compiler): void
@@ -51,19 +51,58 @@ final class ComponentNode extends Node implements NodeOutputInterface
 
         $useYield = method_exists(Environment::class, 'useYield') && $compiler->getEnvironment()->useYield();
 
-        // since twig/twig 3.9.0: Using the internal "twig_to_array" function is deprecated.
-        if (method_exists(CoreExtension::class, 'toArray')) {
-            $twig_to_array = 'Twig\Extension\CoreExtension::toArray';
-        } else {
-            $twig_to_array = 'twig_to_array';
-        }
-
         $componentRuntime = $compiler->getVarName();
-
         $compiler
                ->write(\sprintf('$%s = $this->env->getRuntime(', $componentRuntime))
                ->string(ComponentRuntime::class)
                ->raw(");\n");
+
+        $componentName = $compiler->getVarName();
+        $componentExpression = $this->getNode('component');
+
+        if ($componentExpression instanceof NameExpression && !$componentExpression->hasExplicitParentheses()) {
+            $compiler
+                ->write(\sprintf('$%s = %s;', $componentName, var_export($componentExpression->getAttribute('name'), true)))
+                ->raw("\n");
+        } else {
+            $componentNameValue = $compiler->getVarName();
+            $compiler
+                ->write(\sprintf('$%s = ', $componentNameValue))
+            ;
+
+            $compiler->subcompile($componentExpression);
+            $compiler->raw(";\n");
+
+            $compiler
+                ->write(\sprintf('if (\\is_scalar($%s) || $%s instanceof \\Stringable) {', $componentNameValue, $componentNameValue))
+                ->raw("\n")
+                ->indent()
+                ->write(\sprintf('$%s = (string) $%s;', $componentName, $componentNameValue))
+                ->raw("\n")
+                ->outdent()
+                ->write("} else {\n")
+                ->indent()
+                ->write('throw new ')
+                ->raw('\\'.SyntaxError::class)
+                ->raw('(sprintf(')
+                ->string('The component expression passed to "{%% component %%}" must evaluate to a component name (string/scalar/Stringable). Got "%s".')
+                ->raw(', \\get_debug_type(')
+                ->raw(\sprintf('$%s', $componentNameValue))
+                ->raw(')), ')
+                ->repr($this->getTemplateLine())
+                ->raw(", \$this->getSourceContext());\n")
+                ->outdent()
+                ->write("}\n");
+        }
+
+        // Compile props once: Twig 3.24+ null-safe chains are stateful when compiled.
+        $props = $compiler->getVarName();
+        $compiler
+            ->write(\sprintf('$%s = ', $props))
+            ->raw('Twig\Extension\CoreExtension::toArray')
+            ->raw('(');
+        $this->writeProps($compiler)
+            ->raw(");\n");
 
         /*
          * Block 1) PreCreateForRender handling
@@ -73,12 +112,7 @@ final class ComponentNode extends Node implements NodeOutputInterface
          */
         $compiler
             ->write(\sprintf('$preRendered = $%s->preRender(', $componentRuntime))
-            ->string($this->getAttribute('component'))
-            ->raw(', ')
-            ->raw($twig_to_array)
-            ->raw('(');
-        $this->writeProps($compiler)
-            ->raw(')')
+            ->raw(\sprintf('$%s, $%s', $componentName, $props))
             ->raw(");\n");
 
         $compiler
@@ -105,12 +139,7 @@ final class ComponentNode extends Node implements NodeOutputInterface
          */
         $compiler
             ->write(\sprintf('$preRenderEvent = $%s->startEmbedComponent(', $componentRuntime))
-            ->string($this->getAttribute('component'))
-            ->raw(', ')
-            ->raw($twig_to_array)
-            ->raw('(');
-        $this->writeProps($compiler)
-            ->raw('), ')
+            ->raw(\sprintf('$%s, $%s, ', $componentName, $props))
             ->raw($this->getAttribute('only') ? '[]' : '$context')
             ->raw(', ')
             ->string($this->getAttribute('embedded_template'))

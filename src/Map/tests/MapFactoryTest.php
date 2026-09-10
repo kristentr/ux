@@ -30,7 +30,7 @@ class MapFactoryTest extends TestCase
         DummyOptions::unregisterFromNormalizer();
     }
 
-    public function testFromArray()
+    public function testFromArray(): void
     {
         $array = self::createMapArray();
         $map = Map::fromArray($array);
@@ -50,21 +50,19 @@ class MapFactoryTest extends TestCase
         $this->assertCount(1, $polygons = $map->toArray()['polygons']);
         $this->assertEquals($array['polygons'][0]['points'], $polygons[0]['points']);
         $this->assertEquals($array['polygons'][0]['points'], $polygons[0]['points']);
-        $this->assertSame($array['polygons'][0]['title'], $polygons[0]['title']);
         $this->assertSame($array['polygons'][0]['infoWindow']['headerContent'], $polygons[0]['infoWindow']['headerContent']);
         $this->assertSame($array['polygons'][0]['infoWindow']['content'], $polygons[0]['infoWindow']['content']);
 
         $this->assertCount(1, $polylines = $map->toArray()['polylines']);
         $this->assertEquals($array['polylines'][0]['points'], $polylines[0]['points']);
         $this->assertEquals($array['polylines'][0]['points'], $polylines[0]['points']);
-        $this->assertSame($array['polylines'][0]['title'], $polylines[0]['title']);
         $this->assertSame($array['polylines'][0]['infoWindow']['headerContent'], $polylines[0]['infoWindow']['headerContent']);
         $this->assertSame($array['polylines'][0]['infoWindow']['content'], $polylines[0]['infoWindow']['content']);
     }
 
-    public function testToArrayFromArray()
+    public function testToArrayFromArray(): void
     {
-        $map = (new Map())
+        $map = new Map()
             ->center(new Point(48.8566, 2.3522))
             ->zoom(12)
             ->addMarker(new Marker(
@@ -94,7 +92,7 @@ class MapFactoryTest extends TestCase
         $this->assertEquals($map->toArray(), $newMap->toArray());
     }
 
-    public function testFromArrayWithInvalidCenter()
+    public function testFromArrayWithInvalidCenter(): void
     {
         $array = self::createMapArray();
         $array['center'] = 'invalid';
@@ -103,7 +101,7 @@ class MapFactoryTest extends TestCase
         Map::fromArray($array);
     }
 
-    public function testFromArrayWithInvalidZoom()
+    public function testFromArrayWithInvalidZoom(): void
     {
         $array = self::createMapArray();
         $array['zoom'] = 'invalid';
@@ -112,7 +110,7 @@ class MapFactoryTest extends TestCase
         Map::fromArray($array);
     }
 
-    public function testFromArrayWithInvalidMarkers()
+    public function testFromArrayWithInvalidMarkers(): void
     {
         $array = self::createMapArray();
         $array['markers'] = 'invalid';
@@ -122,7 +120,7 @@ class MapFactoryTest extends TestCase
         Map::fromArray($array);
     }
 
-    public function testFromArrayWithInvalidMarker()
+    public function testFromArrayWithInvalidMarker(): void
     {
         $array = self::createMapArray();
         $array['markers'] = [
@@ -136,7 +134,7 @@ class MapFactoryTest extends TestCase
         Map::fromArray($array);
     }
 
-    public function testFromArrayWithInvalidPolygons()
+    public function testFromArrayWithInvalidPolygons(): void
     {
         $array = self::createMapArray();
         $array['polygons'] = 'invalid';
@@ -146,7 +144,7 @@ class MapFactoryTest extends TestCase
         Map::fromArray($array);
     }
 
-    public function testFromArrayWithInvalidPolygon()
+    public function testFromArrayWithInvalidPolygon(): void
     {
         $array = self::createMapArray();
         $array['polygons'] = [
@@ -160,7 +158,7 @@ class MapFactoryTest extends TestCase
         Map::fromArray($array);
     }
 
-    public function testFromArrayWithInvalidPolylines()
+    public function testFromArrayWithInvalidPolylines(): void
     {
         $array = self::createMapArray();
         $array['polylines'] = 'invalid';
@@ -170,7 +168,7 @@ class MapFactoryTest extends TestCase
         Map::fromArray($array);
     }
 
-    public function testFromArrayWithInvalidPolyline()
+    public function testFromArrayWithInvalidPolyline(): void
     {
         $array = self::createMapArray();
         $array['polylines'] = [
@@ -221,7 +219,6 @@ class MapFactoryTest extends TestCase
                             'lng' => 2.3522,
                         ],
                     ],
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => 'Polygon 1',
                         'content' => 'Polygon 1',
@@ -244,7 +241,6 @@ class MapFactoryTest extends TestCase
                             'lng' => 2.3522,
                         ],
                     ],
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => 'Polyline 1',
                         'content' => 'Polyline 1',

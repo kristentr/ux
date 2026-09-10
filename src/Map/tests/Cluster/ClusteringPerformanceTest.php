@@ -11,12 +11,15 @@
 
 namespace Symfony\UX\Map\Tests\Cluster;
 
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\RequiresOperatingSystem;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Map\Cluster\ClusteringAlgorithmInterface;
 use Symfony\UX\Map\Cluster\GridClusteringAlgorithm;
 use Symfony\UX\Map\Cluster\MortonClusteringAlgorithm;
 use Symfony\UX\Map\Point;
 
+#[RequiresOperatingSystem('^(?!WIN)')]
 class ClusteringPerformanceTest extends TestCase
 {
     /**
@@ -50,10 +53,9 @@ class ClusteringPerformanceTest extends TestCase
 
     /**
      * Scenario 1: Large number of points (50,000), concentrated area (Paris region).
-     *
-     * @dataProvider algorithmProvider
      */
-    public function testScenarioRegion50000(ClusteringAlgorithmInterface $algorithm, float $zoom)
+    #[DataProvider('algorithmProvider')]
+    public function testScenarioRegion50000(ClusteringAlgorithmInterface $algorithm, float $zoom): void
     {
         $points = $this->generatePoints(50000, 48.8, 49, 2.2, 2.5);
 
@@ -62,10 +64,9 @@ class ClusteringPerformanceTest extends TestCase
 
     /**
      * Scenario 2: Moderate number of points (5,000), broad area (France and surroundings).
-     *
-     * @dataProvider algorithmProvider
      */
-    public function testScenarioCountry5000(ClusteringAlgorithmInterface $algorithm, float $zoom)
+    #[DataProvider('algorithmProvider')]
+    public function testScenarioCountry5000(ClusteringAlgorithmInterface $algorithm, float $zoom): void
     {
         $points = $this->generatePoints(5000, 30, 60, -10, 35);
 
@@ -74,10 +75,9 @@ class ClusteringPerformanceTest extends TestCase
 
     /**
      * Scenario 3: Very large number of points (100,000), global distribution.
-     *
-     * @dataProvider algorithmProvider
      */
-    public function testScenarioWorld100000(ClusteringAlgorithmInterface $algorithm, float $zoom)
+    #[DataProvider('algorithmProvider')]
+    public function testScenarioWorld100000(ClusteringAlgorithmInterface $algorithm, float $zoom): void
     {
         $points = $this->generatePoints(100000, -90, 90, -180, 180);
 

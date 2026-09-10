@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\TwigComponent\DependencyInjection;
 
+use Symfony\Bundle\TwigBundle\DependencyInjection\Compiler\SafeClassPass;
 use Symfony\Component\Config\Definition\Builder\ArrayNodeDefinition;
 use Symfony\Component\Config\Definition\Builder\TreeBuilder;
 use Symfony\Component\Config\Definition\ConfigurationInterface;
@@ -30,6 +31,7 @@ use Symfony\Component\DependencyInjection\Reference;
 use Symfony\UX\TwigComponent\Attribute\AsTwigComponent;
 use Symfony\UX\TwigComponent\CacheWarmer\TwigComponentCacheWarmer;
 use Symfony\UX\TwigComponent\Command\TwigComponentDebugCommand;
+use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\UX\TwigComponent\ComponentFactory;
 use Symfony\UX\TwigComponent\ComponentProperties;
 use Symfony\UX\TwigComponent\ComponentRenderer;
@@ -49,8 +51,6 @@ use Symfony\UX\TwigComponent\Twig\TwigEnvironmentConfigurator;
  */
 final class TwigComponentExtension extends Extension implements ConfigurationInterface
 {
-    private const DEPRECATED_DEFAULT_KEY = '__deprecated__use_old_naming_behavior';
-
     public function load(array $configs, ContainerBuilder $container): void
     {
         $loader = new PhpFileLoader($container, new FileLocator(__DIR__.'/../../config'));
@@ -62,12 +62,6 @@ final class TwigComponentExtension extends Extension implements ConfigurationInt
         $configuration = $this->getConfiguration($configs, $container);
         $config = $this->processConfiguration($configuration, $configs);
         $defaults = $config['defaults'];
-        if ($defaults === [self::DEPRECATED_DEFAULT_KEY]) {
-            trigger_deprecation('symfony/ux-twig-component', '2.13', 'Not setting the "twig_component.defaults" config option is deprecated. Check the documentation for an example configuration.');
-            $container->setParameter('ux.twig_component.legacy_autonaming', true);
-
-            $defaults = [];
-        }
         $container->setParameter('ux.twig_component.component_defaults', $defaults);
 
         $container->register('ux.twig_component.component_template_finder', ComponentTemplateFinder::class)
@@ -126,15 +120,22 @@ final class TwigComponentExtension extends Extension implements ConfigurationInt
             ->setArguments([
                 new Reference('ux.twig_component.component_renderer'),
                 new ServiceLocatorArgument(new TaggedIteratorArgument('ux.twig_component.twig_renderer', indexAttribute: 'key', needsIndexes: true)),
+                new Reference('ux.twig_component.component_stack'),
             ])
             ->addTag('twig.runtime')
         ;
 
-        $container->register('ux.twig_component.twig.lexer', ComponentLexer::class);
+        $container->register('ux.twig_component.twig.lexer', ComponentLexer::class)
+            ->setArguments([new Reference('twig')]);
 
-        $container->register('ux.twig_component.twig.environment_configurator', TwigEnvironmentConfigurator::class)
-            ->setDecoratedService(new Reference('twig.configurator.environment'))
-            ->setArguments([new Reference('ux.twig_component.twig.environment_configurator.inner')]);
+        if (class_exists(SafeClassPass::class)) {
+            $container->register(ComponentAttributes::class)
+                ->addResourceTag('twig.safe_class', ['strategy' => 'html']);
+        } else {
+            $container->register('ux.twig_component.twig.environment_configurator', TwigEnvironmentConfigurator::class)
+                ->setDecoratedService(new Reference('twig.configurator.environment'))
+                ->setArguments([new Reference('ux.twig_component.twig.environment_configurator.inner')]);
+        }
 
         $container->register('ux.twig_component.command.debug', TwigComponentDebugCommand::class)
             ->setArguments([
@@ -146,9 +147,6 @@ final class TwigComponentExtension extends Extension implements ConfigurationInt
             ])
             ->addTag('console.command')
         ;
-
-        $container->setAlias('console.command.stimulus_component_debug', 'ux.twig_component.command.debug')
-            ->setDeprecated('symfony/ux-twig-component', '2.13', '%alias_id%');
 
         if ($this->isConfigEnabled($container, $config['profiler'])) {
             $loader->load('debug.php');
@@ -173,19 +171,9 @@ final class TwigComponentExtension extends Extension implements ConfigurationInt
         \assert($rootNode instanceof ArrayNodeDefinition);
 
         $rootNode
-            ->validate()
-            ->always(static function ($v) {
-                if (!isset($v['anonymous_template_directory'])) {
-                    trigger_deprecation('symfony/twig-component-bundle', '2.13', 'Not setting the "twig_component.anonymous_template_directory" config option is deprecated. It will default to "components" in 3.0.');
-                    $v['anonymous_template_directory'] = null;
-                }
-
-                return $v;
-            })
-            ->end()
             ->children()
                 ->arrayNode('defaults')
-                    ->defaultValue([self::DEPRECATED_DEFAULT_KEY])
+                    ->isRequired()
                     ->useAttributeAsKey('namespace')
                     ->validate()
                         ->always(static function ($v) {
@@ -216,6 +204,7 @@ final class TwigComponentExtension extends Extension implements ConfigurationInt
                     ->end()
                 ->end()
                 ->scalarNode('anonymous_template_directory')
+                    ->isRequired()
                     ->info('Defaults to `components`')
                 ->end()
                 ->arrayNode('profiler')
@@ -225,10 +214,6 @@ final class TwigComponentExtension extends Extension implements ConfigurationInt
                         ->booleanNode('enabled')->defaultValue('%kernel.debug%')->end()
                         ->booleanNode('collect_components')->info('Collect components instances')->defaultTrue()->end()
                     ->end()
-                ->end()
-                ->scalarNode('controllers_json')
-                    ->setDeprecated('symfony/ux-twig-component', '2.18', 'The "twig_component.controllers_json" config option is deprecated, and will be removed in 3.0.')
-                    ->defaultNull()
                 ->end()
             ->end();
 

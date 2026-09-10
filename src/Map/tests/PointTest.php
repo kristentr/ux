@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\Map\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Map\Exception\InvalidArgumentException;
 use Symfony\UX\Map\Point;
@@ -25,10 +26,8 @@ class PointTest extends TestCase
         yield [0, -181, 'Longitude must be between -180 and 180 degrees, "-181" given.'];
     }
 
-    /**
-     * @dataProvider provideInvalidPoint
-     */
-    public function testInvalidPoint(float $latitude, float $longitude, string $expectedExceptionMessage)
+    #[DataProvider('provideInvalidPoint')]
+    public function testInvalidPoint(float $latitude, float $longitude, string $expectedExceptionMessage): void
     {
         self::expectException(InvalidArgumentException::class);
         self::expectExceptionMessage($expectedExceptionMessage);
@@ -36,21 +35,21 @@ class PointTest extends TestCase
         new Point($latitude, $longitude);
     }
 
-    public function testGetLatitude()
+    public function testGetLatitude(): void
     {
         $point = new Point(48.8566, 2.3533);
 
         self::assertSame(48.8566, $point->getLatitude());
     }
 
-    public function testGetLongitude()
+    public function testGetLongitude(): void
     {
         $point = new Point(48.8566, 2.3533);
 
         self::assertSame(2.3533, $point->getLongitude());
     }
 
-    public function testToArray()
+    public function testToArray(): void
     {
         $point = new Point(48.8566, 2.3533);
 

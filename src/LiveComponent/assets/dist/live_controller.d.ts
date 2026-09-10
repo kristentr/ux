@@ -1,11 +1,21 @@
 import { Controller } from "@hotwired/stimulus";
+interface Download {
+  filename: string;
+  blob: Blob;
+}
 declare class export_default$2 {
   response: Response;
   private body;
   private liveUrl;
+  private download;
+  private parsePromise;
   constructor(response: Response);
   getBody(): Promise<string>;
+  getDownload(): Download | null;
   getLiveUrl(): string | null;
+  getDownloadUrl(): string | null;
+  isRemoved(): boolean;
+  private parse;
 }
 declare class export_default$1 {
   promise: Promise<Response>;
@@ -100,6 +110,7 @@ declare class Component {
   private pendingActions;
   private pendingFiles;
   private isRequestPending;
+  private isRemoved;
   private requestDebounceTimeout;
   private nextRequestPromise;
   private nextRequestPromiseResolve;
@@ -125,6 +136,7 @@ declare class Component {
   private performEmit;
   private doEmit;
   private isTurboEnabled;
+  private removeFromPage;
   private tryStartingRequest;
   private performRequest;
   private processRerender;

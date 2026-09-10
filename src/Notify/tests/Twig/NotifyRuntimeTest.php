@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\Notify\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Notify\Tests\Kernel\TwigAppKernel;
 use Symfony\UX\Notify\Twig\NotifyRuntime;
@@ -22,10 +23,8 @@ use Symfony\UX\Notify\Twig\NotifyRuntime;
  */
 class NotifyRuntimeTest extends TestCase
 {
-    /**
-     * @dataProvider streamNotificationsDataProvider
-     */
-    public function testStreamNotifications(array $params, string $expected)
+    #[DataProvider('streamNotificationsDataProvider')]
+    public function testStreamNotifications(array $params, string $expected): void
     {
         $kernel = new TwigAppKernel('test', true);
         $kernel->boot();

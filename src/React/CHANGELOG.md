@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 3.4
+
+- Add support for `import.meta.glob()` (Symfony Reprise) in `registerReactControllerComponents()`
+
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- Remove old compatibility layer with deprecated `StimulusTwigExtension` from WebpackEncoreBundle ^1.0, use StimulusBundle instead
+
+## 2.35
+
+- Allow Symfony UX 3.x packages
+
 ## 2.33
 
 - Add support for React 19.

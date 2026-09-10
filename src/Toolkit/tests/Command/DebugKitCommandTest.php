@@ -20,7 +20,7 @@ class DebugKitCommandTest extends KernelTestCase
     use InteractsWithConsole;
     use TestHelperTrait;
 
-    public function testShouldBeAbleToDebugShadcnKit()
+    public function testShouldBeAbleToDebugShadcnKit(): void
     {
         $this->bootKernel();
         $this->consoleCommand(\sprintf('ux:toolkit:debug-kit %s', self::getLocalKitPath('shadcn')))
@@ -39,7 +39,9 @@ class DebugKitCommandTest extends KernelTestCase
                 '|              | templates/components/Avatar/Group.html.twig                                      |',
                 '|              | templates/components/Avatar/GroupCount.html.twig                                 |',
                 '|              | templates/components/Avatar/Image.html.twig                                      |',
-                '| Dependencies | tales-from-a-dev/twig-tailwind-extra:^1.0.0                                      |',
+                '| Dependencies | twig/html-extra:^3.24.0                                                          |',
+                '|              | symfony/ux-twig-component:^3.5                                                   |',
+                '|              | tales-from-a-dev/twig-tailwind-extra:^1.3.0                                      |',
                 '+--------------+----------------------------------------------------------------------------------+',
             ]))
             ->assertOutputContains(implode(\PHP_EOL, [
@@ -52,12 +54,14 @@ class DebugKitCommandTest extends KernelTestCase
                 '|              | templates/components/Table/Head.html.twig                                        |',
                 '|              | templates/components/Table/Header.html.twig                                      |',
                 '|              | templates/components/Table/Row.html.twig                                         |',
-                '| Dependencies | tales-from-a-dev/twig-tailwind-extra:^1.0.0                                      |',
+                '| Dependencies | twig/html-extra:^3.24.0                                                          |',
+                '|              | symfony/ux-twig-component:^3.5                                                   |',
+                '|              | tales-from-a-dev/twig-tailwind-extra:^1.3.0                                      |',
                 '+--------------+----------------------------------------------------------------------------------+',
             ]));
     }
 
-    public function testShouldBeAbleToDebugFixtureKitWithManyDependencies()
+    public function testShouldBeAbleToDebugFixtureKitWithManyDependencies(): void
     {
         $this->bootKernel();
         $this->consoleCommand(\sprintf('ux:toolkit:debug-kit %s', self::getFixtureKitPath('with-many-dependencies')))
@@ -74,8 +78,8 @@ class DebugKitCommandTest extends KernelTestCase
                 '| Dependencies | button                                                                           |',
                 '|              | twig/html-extra:^3.12.0                                                          |',
                 '|              | tales-from-a-dev/twig-tailwind-extra:^1.0.0                                      |',
-                '|              | tailwindcss:^4.0.0                                                               |',
-                '|              | @tailwindplus/elements:1                                                         |',
+                '|              | tailwindcss@^4.0.0                                                               |',
+                '|              | @tailwindplus/elements@1                                                         |',
                 '|              | @hotwired/stimulus                                                               |',
                 '+--------------+----------------------------------------------------------------------------------+',
             ]))
@@ -84,7 +88,7 @@ class DebugKitCommandTest extends KernelTestCase
                 '| File(s)      | N/A                                                                              |',
                 '| Dependencies | twig/html-extra:^3.12.0                                                          |',
                 '|              | another/php-package:^2.0                                                         |',
-                '|              | another-npm-package:^1.0.0                                                       |',
+                '|              | another-npm-package@^1.0.0                                                       |',
                 '|              | another-importmap-package                                                        |',
                 '+--------------+----------------------------------------------------------------------------------+',
             ]));

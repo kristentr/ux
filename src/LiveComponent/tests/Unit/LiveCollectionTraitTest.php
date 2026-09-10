@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\LiveComponent\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\PropertyAccess\PropertyAccess;
@@ -21,8 +22,8 @@ use Symfony\UX\LiveComponent\LiveCollectionTrait;
  */
 final class LiveCollectionTraitTest extends TestCase
 {
-    /** @dataProvider provideAddedItems */
-    public function testAddCollectionItem(array $postedFormData, string $collectionFieldName, array $expectedFormData)
+    #[DataProvider('provideAddedItems')]
+    public function testAddCollectionItem(array $postedFormData, string $collectionFieldName, array $expectedFormData): void
     {
         $component = $this->createComponent($postedFormData);
 
@@ -31,8 +32,8 @@ final class LiveCollectionTraitTest extends TestCase
         self::assertSame($expectedFormData[$component->formName], $component->formValues);
     }
 
-    /** @dataProvider provideRemovedItems */
-    public function testRemoveCollectionItem(array $postedFormData, string $collectionFieldName, int $index, array $expectedFormData)
+    #[DataProvider('provideRemovedItems')]
+    public function testRemoveCollectionItem(array $postedFormData, string $collectionFieldName, int $index, array $expectedFormData): void
     {
         $component = $this->createComponent($postedFormData);
 
@@ -208,7 +209,7 @@ final class LiveCollectionTraitTest extends TestCase
 
     private function createComponent(array $postedFormData)
     {
-        $form = $this->createMock(FormInterface::class);
+        $form = $this->createStub(FormInterface::class);
         $component = new class($form) {
             use LiveCollectionTrait;
 

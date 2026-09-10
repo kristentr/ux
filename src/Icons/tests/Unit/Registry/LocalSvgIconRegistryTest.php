@@ -11,8 +11,10 @@
 
 namespace Symfony\UX\Icons\Tests\Unit\Registry;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Icons\Icon;
+use Symfony\UX\Icons\IconFactory;
 use Symfony\UX\Icons\Registry\LocalSvgIconRegistry;
 
 /**
@@ -20,10 +22,8 @@ use Symfony\UX\Icons\Registry\LocalSvgIconRegistry;
  */
 final class LocalSvgIconRegistryTest extends TestCase
 {
-    /**
-     * @dataProvider validSvgProvider
-     */
-    public function testValidSvgs(string $name, array $expectedAttributes, string $expectedContent)
+    #[DataProvider('validSvgProvider')]
+    public function testValidSvgs(string $name, array $expectedAttributes, string $expectedContent): void
     {
         $icon = $this->registry()->get($name);
         $this->assertInstanceOf(Icon::class, $icon);
@@ -35,39 +35,37 @@ final class LocalSvgIconRegistryTest extends TestCase
     {
         yield [
             'valid1',
-            ['viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
+            ['xmlns' => 'http://www.w3.org/2000/svg', 'viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
             '<path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd"></path>',
         ];
 
         yield [
             'valid2',
-            ['viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
+            ['xmlns' => 'http://www.w3.org/2000/svg', 'viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
             '<path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd"></path>',
         ];
 
         yield [
             'valid3',
-            ['viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
+            ['xmlns' => 'http://www.w3.org/2000/svg', 'viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
             '<path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd"></path>',
         ];
 
         yield [
             'valid4',
-            ['viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
+            ['xmlns' => 'http://www.w3.org/2000/svg', 'viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
             '<path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd"></path><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd"></path>',
         ];
 
         yield [
             'valid5',
-            ['viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
+            ['xmlns' => 'http://www.w3.org/2000/svg', 'viewBox' => '0 0 24 24', 'fill' => 'currentColor', 'class' => 'w-6 h-6'],
             '<path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd"></path><g><path fill-rule="evenodd" d="M7.5 6a4.5 4.5 0 1 1 9 0 4.5 4.5 0 0 1-9 0ZM3.751 20.105a8.25 8.25 0 0 1 16.498 0 .75.75 0 0 1-.437.695A18.683 18.683 0 0 1 12 22.5c-2.786 0-5.433-.608-7.812-1.7a.75.75 0 0 1-.437-.695Z" clip-rule="evenodd"></path></g>',
         ];
     }
 
-    /**
-     * @dataProvider invalidSvgProvider
-     */
-    public function testInvalidSvgs(string $name)
+    #[DataProvider('invalidSvgProvider')]
+    public function testInvalidSvgs(string $name): void
     {
         $this->expectException(\RuntimeException::class);
 
@@ -82,12 +80,11 @@ final class LocalSvgIconRegistryTest extends TestCase
         yield ['invalid4'];
     }
 
-    /**
-     * @dataProvider provideIconSetPathsCases
-     */
-    public function testIconSetPaths(string $name, array $iconSetPaths, ?string $expectedContent)
+    #[DataProvider('provideIconSetPathsCases')]
+    public function testIconSetPaths(string $name, array $iconSetPaths, ?string $expectedContent): void
     {
         $registry = new LocalSvgIconRegistry(
+            iconFactory: new IconFactory(),
             iconDir: __DIR__.'/../../Fixtures/icons',
             iconSetPaths: $iconSetPaths,
         );
@@ -146,6 +143,6 @@ final class LocalSvgIconRegistryTest extends TestCase
 
     private function registry(): LocalSvgIconRegistry
     {
-        return new LocalSvgIconRegistry(__DIR__.'/../../Fixtures/svg');
+        return new LocalSvgIconRegistry(new IconFactory(), __DIR__.'/../../Fixtures/svg');
     }
 }

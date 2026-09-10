@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Symfony package.
  *
@@ -21,7 +19,7 @@ use Symfony\UX\Toolkit\Recipe\RecipeSynchronizer;
 
 final class RecipeSynchronizerTest extends TestCase
 {
-    public function testSynchronize()
+    public function testSynchronize(): void
     {
         $kit = new Kit(__DIR__, new KitManifest('foo', 'Description', 'MIT', 'https://example.com'));
         $recipeSynchronizer = new RecipeSynchronizer();
@@ -33,6 +31,8 @@ final class RecipeSynchronizerTest extends TestCase
         $recipeAlert = $kit->getRecipe('alert');
         $this->assertNotNull($recipeAlert);
         $this->assertEquals('Alert', $recipeAlert->manifest->name);
-        $this->assertEquals('A notification component that displays important messages with an icon, title, and description.', $recipeAlert->manifest->description);
+        // The alert recipe ships a README.md, loaded into the recipe.
+        $this->assertNotNull($recipeAlert->doc);
+        $this->assertStringContainsString('::: installation', $recipeAlert->doc);
     }
 }

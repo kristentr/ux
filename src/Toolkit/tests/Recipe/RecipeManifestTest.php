@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Symfony package.
  *
@@ -24,7 +22,7 @@ use Symfony\UX\Toolkit\Recipe\RecipeType;
 
 final class RecipeManifestTest extends TestCase
 {
-    public function testFromJsonWithInvalidJson()
+    public function testFromJsonWithInvalidJson(): void
     {
         $this->expectException(\JsonException::class);
         $this->expectExceptionMessage('Syntax error');
@@ -32,7 +30,7 @@ final class RecipeManifestTest extends TestCase
         RecipeManifest::fromJson('test');
     }
 
-    public function testFromJsonWithEmpty()
+    public function testFromJsonWithEmpty(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Property "type" is required.');
@@ -40,7 +38,7 @@ final class RecipeManifestTest extends TestCase
         RecipeManifest::fromJson('{}');
     }
 
-    public function testFromJsonWithInvalidType()
+    public function testFromJsonWithInvalidType(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The recipe type "test" is not supported, valid types are "block", "component".');
@@ -52,7 +50,7 @@ final class RecipeManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithMissingName()
+    public function testFromJsonWithMissingName(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Property "name" is required.');
@@ -64,20 +62,7 @@ final class RecipeManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithMissingDescription()
-    {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Property "description" is required.');
-
-        RecipeManifest::fromJson(<<<JSON
-                {
-                    "type": "component",
-                    "name": "MyComponent"
-                }
-            JSON);
-    }
-
-    public function testFromJsonWithInvalidDependencies()
+    public function testFromJsonWithInvalidDependencies(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The "dependencies" property must be an object.');
@@ -86,7 +71,6 @@ final class RecipeManifestTest extends TestCase
                 {
                     "type": "component",
                     "name": "MyComponent",
-                    "description": "An incredible component",
                     "copy-files": {
                         "templates/": "templates/"
                     },
@@ -95,7 +79,7 @@ final class RecipeManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithInvalidPhpDependency()
+    public function testFromJsonWithInvalidPhpDependency(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The dependency #0 of type "composer" must be a non-empty string.');
@@ -104,7 +88,6 @@ final class RecipeManifestTest extends TestCase
                 {
                     "type": "component",
                     "name": "MyComponent",
-                    "description": "An incredible component",
                     "copy-files": {
                         "templates/": "templates/"
                     },
@@ -115,7 +98,7 @@ final class RecipeManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithInvalidNpmDependency()
+    public function testFromJsonWithInvalidNpmDependency(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The dependency #0 of type "npm" must be a non-empty string.');
@@ -124,7 +107,6 @@ final class RecipeManifestTest extends TestCase
                 {
                     "type": "component",
                     "name": "MyComponent",
-                    "description": "An incredible component",
                     "copy-files": {
                         "templates/": "templates/"
                     },
@@ -136,7 +118,7 @@ final class RecipeManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithInvalidImportmapDependency()
+    public function testFromJsonWithInvalidImportmapDependency(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The dependency #0 of type "importmap" must be a non-empty string.');
@@ -145,7 +127,6 @@ final class RecipeManifestTest extends TestCase
                 {
                     "type": "component",
                     "name": "MyComponent",
-                    "description": "An incredible component",
                     "copy-files": {
                         "templates/": "templates/"
                     },
@@ -158,7 +139,7 @@ final class RecipeManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithInvalidRecipeDependency()
+    public function testFromJsonWithInvalidRecipeDependency(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('The dependency #0 of type "recipe" must be a non-empty string.');
@@ -167,7 +148,6 @@ final class RecipeManifestTest extends TestCase
                 {
                     "type": "component",
                     "name": "MyComponent",
-                    "description": "An incredible component",
                     "copy-files": {
                         "templates/": "templates/"
                     },
@@ -181,13 +161,77 @@ final class RecipeManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithMinimumValidData()
+    public function testFromJsonWithInvalidVersionAdded(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The "version-added" property must be a non-empty string.');
+
+        RecipeManifest::fromJson(<<<JSON
+                {
+                    "type": "component",
+                    "name": "MyComponent",
+                    "version-added": "",
+                    "copy-files": {
+                        "templates/": "templates/"
+                    }
+                }
+            JSON);
+    }
+
+    public function testFromJsonWithTraversalInCopyFilesSource(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The path "../../../../tmp/PWNED" must not escape its target directory.');
+
+        RecipeManifest::fromJson(<<<JSON
+                {
+                    "type": "component",
+                    "name": "MyComponent",
+                    "copy-files": {
+                        "../../../../tmp/PWNED": "templates/"
+                    }
+                }
+            JSON);
+    }
+
+    public function testFromJsonWithTraversalInCopyFilesDestination(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The path "../../../../tmp/PWNED" must not escape its target directory.');
+
+        RecipeManifest::fromJson(<<<JSON
+                {
+                    "type": "component",
+                    "name": "MyComponent",
+                    "copy-files": {
+                        "templates/": "../../../../tmp/PWNED"
+                    }
+                }
+            JSON);
+    }
+
+    public function testFromJsonWithBackslashTraversalInCopyFilesDestination(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The path "..\\..\\tmp\\PWNED" must not escape its target directory.');
+
+        RecipeManifest::fromJson(<<<JSON
+                {
+                    "type": "component",
+                    "name": "MyComponent",
+                    "copy-files": {
+                        "templates/": "..\\\\..\\\\tmp\\\\PWNED"
+                    }
+                }
+            JSON);
+    }
+
+    public function testFromJsonWithMinimumValidData(): void
     {
         $manifest = RecipeManifest::fromJson(<<<JSON
                 {
                     "type": "component",
                     "name": "MyComponent",
-                    "description": "An incredible component",
                     "copy-files": {
                         "templates/": "templates/"
                     }
@@ -196,18 +240,18 @@ final class RecipeManifestTest extends TestCase
 
         $this->assertSame(RecipeType::Component, $manifest->type);
         $this->assertSame('MyComponent', $manifest->name);
-        $this->assertSame('An incredible component', $manifest->description);
         $this->assertSame(['templates/' => 'templates/'], $manifest->copyFiles);
         $this->assertEquals([], $manifest->dependencies);
+        $this->assertNull($manifest->versionAdded);
     }
 
-    public function testFromJsonWithValidData()
+    public function testFromJsonWithValidData(): void
     {
         $manifest = RecipeManifest::fromJson(<<<JSON
                 {
                     "type": "component",
                     "name": "MyComponent",
-                    "description": "An incredible component",
+                    "version-added": "2.35",
                     "copy-files": {
                         "templates/": "templates/"
                     },
@@ -233,7 +277,7 @@ final class RecipeManifestTest extends TestCase
 
         $this->assertSame(RecipeType::Component, $manifest->type);
         $this->assertSame('MyComponent', $manifest->name);
-        $this->assertSame('An incredible component', $manifest->description);
+        $this->assertSame('2.35', $manifest->versionAdded);
         $this->assertSame(['templates/' => 'templates/'], $manifest->copyFiles);
         $this->assertEquals([
             new RecipeDependency('OtherComponent'),

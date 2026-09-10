@@ -12,7 +12,6 @@
 namespace Symfony\UX\LiveComponent\Tests\Unit\Attribute;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\UX\LiveComponent\Attribute\AsLiveComponent;
 use Symfony\UX\LiveComponent\Attribute\LiveAction;
 use Symfony\UX\LiveComponent\Attribute\LiveListener;
@@ -27,22 +26,22 @@ use Symfony\UX\LiveComponent\Tests\Fixtures\Component\ComponentWithRepeatedLiveL
  */
 final class AsLiveComponentTest extends TestCase
 {
-    public function testPreDehydrateMethodsAreOrderedByPriority()
+    public function testPreDehydrateMethodsAreOrderedByPriority(): void
     {
         $hooks = AsLiveComponent::preDehydrateMethods(
             new class {
                 #[PreDehydrate(priority: -10)]
-                public function hook1()
+                public function hook1(): void
                 {
                 }
 
                 #[PreDehydrate(priority: 10)]
-                public function hook2()
+                public function hook2(): void
                 {
                 }
 
                 #[PreDehydrate]
-                public function hook3()
+                public function hook3(): void
                 {
                 }
             }
@@ -54,22 +53,22 @@ final class AsLiveComponentTest extends TestCase
         $this->assertSame('hook1', $hooks[2]->name);
     }
 
-    public function testPostHydrateMethodsAreOrderedByPriority()
+    public function testPostHydrateMethodsAreOrderedByPriority(): void
     {
         $hooks = AsLiveComponent::postHydrateMethods(
             new class {
                 #[PostHydrate(priority: -10)]
-                public function hook1()
+                public function hook1(): void
                 {
                 }
 
                 #[PostHydrate(priority: 10)]
-                public function hook2()
+                public function hook2(): void
                 {
                 }
 
                 #[PostHydrate]
-                public function hook3()
+                public function hook3(): void
                 {
                 }
             }
@@ -81,22 +80,22 @@ final class AsLiveComponentTest extends TestCase
         $this->assertSame('hook1', $hooks[2]->name);
     }
 
-    public function testPreMountHooksAreOrderedByPriority()
+    public function testPreMountHooksAreOrderedByPriority(): void
     {
         $hooks = AsLiveComponent::preReRenderMethods(
             new class {
                 #[PreReRender(priority: -10)]
-                public function hook1()
+                public function hook1(): void
                 {
                 }
 
                 #[PreReRender(priority: 10)]
-                public function hook2()
+                public function hook2(): void
                 {
                 }
 
                 #[PreReRender]
-                public function hook3()
+                public function hook3(): void
                 {
                 }
             }
@@ -108,7 +107,7 @@ final class AsLiveComponentTest extends TestCase
         $this->assertSame('hook1', $hooks[2]->name);
     }
 
-    public function testCanGetPostHydrateMethodsFromClassString()
+    public function testCanGetPostHydrateMethodsFromClassString(): void
     {
         $methods = AsLiveComponent::postHydrateMethods(DummyLiveComponent::class);
 
@@ -117,7 +116,7 @@ final class AsLiveComponentTest extends TestCase
         $this->assertSame(DummyLiveComponent::class, $methods[0]->getDeclaringClass()?->getName());
     }
 
-    public function testCanGetLiveListeners()
+    public function testCanGetLiveListeners(): void
     {
         $liveListeners = AsLiveComponent::liveListeners(new Component5());
 
@@ -128,7 +127,7 @@ final class AsLiveComponentTest extends TestCase
         ], $liveListeners[0]);
     }
 
-    public function testCanGetLiveListenersFromClassString()
+    public function testCanGetLiveListenersFromClassString(): void
     {
         $liveListeners = AsLiveComponent::liveListeners(DummyLiveComponent::class);
 
@@ -139,7 +138,7 @@ final class AsLiveComponentTest extends TestCase
         ], $liveListeners[0]);
     }
 
-    public function testCanGetRepeatedLiveListeners()
+    public function testCanGetRepeatedLiveListeners(): void
     {
         $liveListeners = AsLiveComponent::liveListeners(new ComponentWithRepeatedLiveListener());
 
@@ -164,68 +163,20 @@ final class AsLiveComponentTest extends TestCase
         ], $liveListeners);
     }
 
-    public function testCanGetRepeatedLiveListenersFromClassString()
+    public function testCanGetRepeatedLiveListenersFromClassString(): void
     {
         $liveListeners = AsLiveComponent::liveListeners(ComponentWithRepeatedLiveListener::class);
 
         $this->assertCount(4, $liveListeners);
     }
 
-    public function testCanCheckIfMethodIsAllowed()
+    public function testCanCheckIfMethodIsAllowed(): void
     {
         $component = new Component5();
 
         $this->assertTrue(AsLiveComponent::isActionAllowed($component, 'method1'));
         $this->assertFalse(AsLiveComponent::isActionAllowed($component, 'method2'));
         $this->assertTrue(AsLiveComponent::isActionAllowed($component, 'aListenerActionMethod'));
-    }
-
-    /**
-     * @group legacy
-     */
-    public function testBackwardsCompatibilityWithAllPositionalArgumentsOldSignature()
-    {
-        // Old signature (before https://github.com/symfony/ux/pull/2251): $csrf was at position 6
-        // Position: 1=name, 2=template, 3=defaultAction, 4=exposePublicProps, 5=attributesVar, 6=csrf, 7=route, 8=method, 9=urlReferenceType
-        $attribute = new AsLiveComponent(
-            'my_component',
-            'components/my.html.twig',
-            '__invoke',
-            true,
-            'attrs',
-            false,
-            'my_custom_route',
-            'get',
-            UrlGeneratorInterface::ABSOLUTE_URL
-        );
-
-        $this->assertFalse($attribute->csrf);
-        $this->assertSame('my_custom_route', $attribute->route);
-        $this->assertSame('get', $attribute->method);
-        $this->assertSame(UrlGeneratorInterface::ABSOLUTE_URL, $attribute->urlReferenceType);
-        $this->assertNull($attribute->fetchCredentials); // fetchCredentials didn't exist in old signature
-    }
-
-    public function testNewSignatureWithAllPositionalArguments()
-    {
-        // New signature (after https://github.com/symfony/ux/pull/2251): $fetchCredentials at position 9, $csrf at position 10
-        // Position: 1=name, 2=template, 3=defaultAction, 4=exposePublicProps, 5=attributesVar, 6=route, 7=method, 8=urlReferenceType, 9=fetchCredentials, 10=csrf
-        $attribute = new AsLiveComponent(
-            'my_component',
-            'components/my.html.twig',
-            '__invoke',
-            true,
-            'attrs',
-            'my_custom_route',
-            'get',
-            UrlGeneratorInterface::ABSOLUTE_URL,
-            'include'
-        );
-
-        $this->assertSame('my_custom_route', $attribute->route);
-        $this->assertSame('get', $attribute->method);
-        $this->assertSame(UrlGeneratorInterface::ABSOLUTE_URL, $attribute->urlReferenceType);
-        $this->assertSame('include', $attribute->fetchCredentials);
     }
 }
 
@@ -241,9 +192,4 @@ class DummyLiveComponent
     {
         return true;
     }
-}
-
-#[AsLiveComponent(method: 'get')]
-class GetMethodComponent
-{
 }

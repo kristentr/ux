@@ -11,6 +11,8 @@
 
 namespace Symfony\UX\Toolkit\Tests\Functional;
 
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Spatie\Snapshots\Drivers\HtmlDriver;
 use Spatie\Snapshots\MatchesSnapshots;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -46,23 +48,16 @@ class ComponentsRenderingTest extends WebTestCase
             $kitSynchronizer->synchronize($kit);
 
             foreach ($kit->getRecipes(RecipeType::Component) as $recipe) {
-                $examplesFilePath = Path::join($recipe->absolutePath, 'examples');
-
-                foreach (glob($examplesFilePath.'/*.html.twig') as $exampleFilePath) {
-                    $filename = pathinfo($exampleFilePath, \PATHINFO_FILENAME);
-                    $code = file_get_contents($exampleFilePath);
-                    yield \sprintf('Kit %s, component %s, code file %s', $kitName, $recipe->name, $filename) => [$kitName, $recipe->name, $code];
+                foreach ($recipe->getExamples() as $i => $example) {
+                    yield \sprintf('Kit %s, component %s, example #%d', $kitName, $recipe->name, $i) => [$kitName, $recipe->name, $example['code']];
                 }
             }
         }
     }
 
-    /**
-     * @dataProvider provideTestComponentRendering
-     *
-     * @group skip-on-lowest
-     */
-    public function testComponentRendering(string $kitName, string $recipeName, string $code)
+    #[DataProvider('provideTestComponentRendering')]
+    #[Group('skip-on-lowest')]
+    public function testComponentRendering(string $kitName, string $recipeName, string $code): void
     {
         $twig = self::getContainer()->get('twig');
         /** @var KitContextRunner $kitContextRunner */
@@ -109,7 +104,17 @@ class ComponentsRenderingTest extends WebTestCase
 
             public function serialize($data): string
             {
-                $serialized = parent::serialize($data);
+                // Encode non-ASCII as numeric entities so libxml parses the input the same way
+                // on every version: libxml < 2.14 assumes Latin-1 when no charset is declared and
+                // corrupts non-ASCII text (e.g. RTL Arabic/Hebrew) into broken per-byte entities.
+                $serialized = parent::serialize(mb_encode_numericentity($data, [0x80, 0x10FFFF, 0, 0x1FFFFF], 'UTF-8'));
+
+                // Decode entities back to raw UTF-8 so snapshots are readable and identical across
+                // libxml versions (libxml < 2.14 re-emits non-ASCII as entities, >= 2.14 emits raw
+                // characters). Structural entities must stay escaped, so shield them while decoding.
+                $shield = ['&amp;' => "\1", '&lt;' => "\2", '&gt;' => "\3", '&quot;' => "\4"];
+                $serialized = strtr(html_entity_decode(strtr($serialized, $shield), \ENT_QUOTES | \ENT_HTML5, 'UTF-8'), array_flip($shield));
+
                 $serialized = str_replace(['<html><body>', '</body></html>'], '', $serialized);
                 $serialized = trim($serialized);
 

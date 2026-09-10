@@ -13,7 +13,6 @@ namespace Symfony\UX\StimulusBundle\Tests\AssetMapper;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\AssetMapper\AssetMapperInterface;
-use Symfony\Component\AssetMapper\ImportMap\ImportMapConfigReader;
 use Symfony\Component\AssetMapper\MappedAsset;
 use Symfony\UX\StimulusBundle\AssetMapper\AutoImportLocator;
 use Symfony\UX\StimulusBundle\AssetMapper\ControllersMapGenerator;
@@ -22,11 +21,10 @@ use Symfony\UX\StimulusBundle\Ux\UxPackageReader;
 
 class ControllersMapGeneratorTest extends TestCase
 {
-    public function testGetControllersMap()
+    public function testGetControllersMap(): void
     {
-        $mapper = $this->createMock(AssetMapperInterface::class);
-        $mapper->expects($this->any())
-            ->method('getAssetFromSourcePath')
+        $mapper = $this->createStub(AssetMapperInterface::class);
+        $mapper->method('getAssetFromSourcePath')
             ->willReturnCallback(static function ($path) {
                 if (str_ends_with($path, 'package-controller-first.js')) {
                     $logicalPath = 'fake-vendor/ux-package1/package-controller-first.js';
@@ -34,7 +32,7 @@ class ControllersMapGeneratorTest extends TestCase
                     $logicalPath = 'fake-vendor/ux-package1/package-controller-second.js';
                 } elseif (str_ends_with($path, 'package-hello-controller.js')) {
                     $logicalPath = 'fake-vendor/ux-package2/package-hello-controller.js';
-                } elseif (str_ends_with($path, 'other-controller.ts') || str_ends_with($path, 'excluded-controller.js')) {
+                } elseif (str_ends_with($path, 'other-controller.ts')) {
                     return null;
                 } else {
                     // replace windows slashes
@@ -53,18 +51,11 @@ class ControllersMapGeneratorTest extends TestCase
 
         $packageReader = new UxPackageReader(__DIR__.'/../fixtures');
 
-        $autoImportLocator = $this->createMock(AutoImportLocator::class);
-        if (class_exists(ImportMapConfigReader::class)) {
-            $autoImportLocator->expects($this->any())
-                ->method('locateAutoImport')
-                ->willReturnCallback(static function ($path) {
-                    return new MappedControllerAutoImport('/path/to'.$path, false);
-                });
-        } else {
-            // @legacy for AssetMapper 6.3
-            $autoImportLocator->expects($this->never())
-                ->method('locateAutoImport');
-        }
+        $autoImportLocator = $this->createStub(AutoImportLocator::class);
+        $autoImportLocator->method('locateAutoImport')
+            ->willReturnCallback(static function ($path) {
+                return new MappedControllerAutoImport('/path/to'.$path, false);
+            });
 
         $generator = new ControllersMapGenerator(
             $mapper,
@@ -77,13 +68,10 @@ class ControllersMapGeneratorTest extends TestCase
             $autoImportLocator,
         );
 
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Could not find an asset mapper path that points to the "excluded" controller.');
         $map = $generator->getControllersMap();
-        // + 3 controller.json UX controllers
-        // - 1 controllers.json UX controller is disabled
-        // + 11 custom controllers (1 file is not a controller, 1 is overridden)
-        $this->assertCount(13, $map);
+        // + 2 UX controllers from controllers.json (1 disabled)
+        // + 12 custom controllers (1 file is not a controller, 1 is overridden)
+        $this->assertCount(14, $map);
         $packageNames = array_keys($map);
         sort($packageNames);
         $this->assertSame([
@@ -96,6 +84,7 @@ class ControllersMapGeneratorTest extends TestCase
             'hello-with-underscores',
             'minified',
             'other',
+            'preserved-comment',
             'subdir--deeper',
             'subdir--deeper-with-dashes',
             'subdir--deeper-with-underscores',
@@ -106,11 +95,7 @@ class ControllersMapGeneratorTest extends TestCase
         $this->assertSame('fake-vendor/ux-package1/package-controller-second.js', $controllerSecond->asset->logicalPath);
         // lazy from user's controller.json
         $this->assertTrue($controllerSecond->isLazy);
-        // @legacy: assert can be without the conditional for AssetMapper 6.4+
-        if (class_exists(ImportMapConfigReader::class)) {
-            // 4 auto imports from package.json
-            $this->assertCount(4, $controllerSecond->autoImports);
-        }
+        $this->assertCount(4, $controllerSecond->autoImports);
 
         $helloControllerFromPackage = $map['fake-vendor--ux-package2--hello-controller'];
         $this->assertSame('fake-vendor/ux-package2/package-hello-controller.js', $helloControllerFromPackage->asset->logicalPath);
@@ -129,5 +114,93 @@ class ControllersMapGeneratorTest extends TestCase
 
         $minifiedController = $map['minified'];
         $this->assertTrue($minifiedController->isLazy);
+
+        $preservedComment = $map['preserved-comment'];
+        $this->assertTrue($preservedComment->isLazy);
+    }
+
+    public function testGetControllersMapThrowsOnUnmappedController(): void
+    {
+        $mapper = $this->createStub(AssetMapperInterface::class);
+        $mapper->method('getAssetFromSourcePath')
+            ->willReturnCallback(static function ($path) {
+                if (str_ends_with($path, 'excluded-controller.js')) {
+                    return null;
+                }
+
+                $path = str_replace('\\', '/', $path);
+                $assetsPosition = strpos($path, '/assets/');
+                $logicalPath = substr($path, $assetsPosition + 1);
+
+                return new MappedAsset($logicalPath, $path);
+            });
+
+        $packageReader = new UxPackageReader(__DIR__.'/../fixtures');
+
+        $autoImportLocator = $this->createStub(AutoImportLocator::class);
+        $autoImportLocator->method('locateAutoImport')
+            ->willReturnCallback(static function ($path) {
+                return new MappedControllerAutoImport('/path/to'.$path, false);
+            });
+
+        $generator = new ControllersMapGenerator(
+            $mapper,
+            $packageReader,
+            [
+                __DIR__.'/../fixtures/assets/more-controllers',
+            ],
+            __DIR__.'/../fixtures/assets/nonexistent.json',
+            $autoImportLocator,
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Could not find an asset mapper path that points to the "excluded" controller.');
+        $generator->getControllersMap();
+    }
+
+    public function testCustomControllersAreSortedByName(): void
+    {
+        $mapper = $this->createMock(AssetMapperInterface::class);
+        $mapper->expects($this->any())
+            ->method('getAssetFromSourcePath')
+            ->willReturnCallback(static function ($path) {
+                // replace windows slashes
+                $path = str_replace('\\', '/', $path);
+                $assetsPosition = strpos($path, '/assets/');
+
+                return new MappedAsset(substr($path, $assetsPosition + 1), $path);
+            });
+
+        $autoImportLocator = $this->createMock(AutoImportLocator::class);
+        $autoImportLocator->expects($this->any())
+            ->method('locateAutoImport')
+            ->willReturnCallback(static function ($path) {
+                return new MappedControllerAutoImport('/path/to'.$path, false);
+            });
+
+        $generator = new ControllersMapGenerator(
+            $mapper,
+            new UxPackageReader(__DIR__.'/../fixtures'),
+            [__DIR__.'/../fixtures/assets/controllers'],
+            __DIR__.'/../fixtures/assets/controllers.json',
+            $autoImportLocator,
+        );
+
+        $customControllers = array_values(array_filter(
+            array_keys($generator->getControllersMap()),
+            static fn (string $name) => !str_starts_with($name, 'fake-vendor--'),
+        ));
+
+        $this->assertSame([
+            'bye',
+            'hello',
+            'hello-with-dashes',
+            'hello-with-underscores',
+            'preserved-comment',
+            'subdir--deeper',
+            'subdir--deeper-with-dashes',
+            'subdir--deeper-with-underscores',
+            'typescript',
+        ], $customControllers);
     }
 }

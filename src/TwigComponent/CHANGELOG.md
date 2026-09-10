@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## 3.5.0
+
+- Add support for `MergeableInterface` from `twig/html-extra` in `ComponentAttributes#defaults()`
+- Add support for dynamic component names in the HTML syntax using `<twig:component is="myComponent" ...`
+- Capture `## <description>` documentation comments written above props inside `{% props %}` (Twig 3.29+), exposed per prop via `PropsNode::getPropDocumentation()`
+- Fix `{% props %}` treating a prop explicitly passed as `null` as missing: a required prop no longer throws, and a prop declaring a default value now keeps the `null` it was given
+- Fix the pre-lexer treating a `{#` inside a `{{ ... }}` expression as the start of a Twig comment, which silently stopped every component after it from being rendered
+- Fix HTML/`{% component %}` syntax failing when a prop uses the null-safe operator (`?.`)
+
+## 3.4.0
+
+- Add support for dynamic component names in the `{% component %}` tag using a
+  parenthesized expression, e.g. `{% component (prefix ~ i) %}{% endcomponent %}`
+
+## 3.2.0
+
+- Add `ComponentRendererInterface::preCreateForRender()`, `ComponentRendererInterface::startEmbeddedComponentRender()`, and `ComponentRendererInterface::finishEmbeddedComponentRender()` methods
+- Allow using `ComponentFactory` and `ComponentRuntime` with any PSR-11
+  container, making `symfony/dependency-injection` optional for standalone usage
+
+## 3.1.0
+
+- Add `provide()` and `inject()` Twig functions to share state from a parent
+  component down to deeply-nested descendants without prop drilling
+- Include the attribute name in the error message thrown when an attribute value is `null`
+
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- The configuration `twig_component.defaults` could not be nullable anymore
+- Remove method `PreCreateForRenderEvent::getProps()` in favor of `PreCreateForRenderEvent::getInputProps()`
+- Remove `cva` Twig function in favor of [`html_cva` Twig function from `twig/html-extra`](https://twig.symfony.com/html_cva)
+- Passing `null` as an attribute value when using `ComponentAttributes` (or `attributes` Twig variable) will now throw an exception, use `remove()` instead
+- Remove method `ComponentAttributes::add()`, use `{{ attributes.defaults(stimulus_controller('...')) }}` instead
+- The `ComponentTemplateFinder` does not accept `Twig\Environment` as first argument anymore, pass a `LoaderInterface` instead
+- The `ComponentTemplateFinder` does not accept a nullable `directory` argument anymore, pass a string instead
+- Remove old compatibility layer with deprecated `StimulusTwigExtension` from WebpackEncoreBundle ^1.0, use StimulusBundle instead
+
+## 2.35
+
+- Add support for `AttributeValueInterface` from `twig/html-extra:^3.24.0` in `ComponentAttributes`
+- Allow Symfony UX 3.x packages
+
 ## 2.33
 
 - Extended support for the `index.html.twig` template fallback when resolving namespaced anonymous components

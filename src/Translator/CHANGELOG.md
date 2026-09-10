@@ -1,5 +1,18 @@
 # CHANGELOG
 
+## 3.4.0
+
+- The component is not experimental anymore
+
+## 3.1.0
+
+- Add `ux:translator:warm-cache` console command to manually dump JS/TS translation files
+
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+
 ## 2.32
 
 - **[BC BREAK]** Refactor API to use string-based translation keys instead of generated constants.

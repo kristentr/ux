@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\Map\Tests;
 
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Map\Circle;
 use Symfony\UX\Map\Exception\InvalidArgumentException;
@@ -34,7 +35,7 @@ class MapTest extends TestCase
         DummyOptions::unregisterFromNormalizer();
     }
 
-    public function testCenterValidation()
+    public function testCenterValidation(): void
     {
         self::expectException(InvalidArgumentException::class);
         self::expectExceptionMessage('The map "center" must be explicitly set when not enabling "fitBoundsToMarkers" feature.');
@@ -43,7 +44,7 @@ class MapTest extends TestCase
         $map->toArray();
     }
 
-    public function testZoomValidation()
+    public function testZoomValidation(): void
     {
         self::expectException(InvalidArgumentException::class);
         self::expectExceptionMessage('The map "zoom" must be explicitly set when not enabling "fitBoundsToMarkers" feature.');
@@ -54,7 +55,7 @@ class MapTest extends TestCase
         $map->toArray();
     }
 
-    public function testZoomAndCenterCanBeOmittedIfFitBoundsToMarkers()
+    public function testZoomAndCenterCanBeOmittedIfFitBoundsToMarkers(): void
     {
         $map = new Map(
             fitBoundsToMarkers: true
@@ -78,7 +79,7 @@ class MapTest extends TestCase
         ], $array);
     }
 
-    public function testWithMinimumConfiguration()
+    public function testWithMinimumConfiguration(): void
     {
         $map = new Map();
         $map
@@ -103,7 +104,7 @@ class MapTest extends TestCase
         ], $array);
     }
 
-    public function testWithMaximumConfiguration()
+    public function testWithMaximumConfiguration(): void
     {
         $map = new Map();
         $map
@@ -289,7 +290,6 @@ class MapTest extends TestCase
                         ['lat' => 48.853, 'lng' => 2.3499],
                         ['lat' => 48.8566, 'lng' => 2.3522],
                     ],
-                    'title' => null,
                     'infoWindow' => null,
                     'extra' => [],
                     'id' => null,
@@ -300,7 +300,6 @@ class MapTest extends TestCase
                         ['lat' => 45.75, 'lng' => 4.85],
                         ['lat' => 45.77, 'lng' => 4.82],
                     ],
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => '<b>Polygon 2</b>',
                         'content' => 'A polygon around Lyon with some additional info.',
@@ -320,7 +319,6 @@ class MapTest extends TestCase
                         ['lat' => 48.853, 'lng' => 2.3499],
                         ['lat' => 48.8566, 'lng' => 2.3522],
                     ],
-                    'title' => null,
                     'infoWindow' => null,
                     'extra' => [],
                     'id' => null,
@@ -331,7 +329,6 @@ class MapTest extends TestCase
                         ['lat' => 45.75, 'lng' => 4.85],
                         ['lat' => 45.77, 'lng' => 4.82],
                     ],
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => '<b>Polyline 2</b>',
                         'content' => 'A polyline around Lyon with some additional info.',
@@ -348,7 +345,6 @@ class MapTest extends TestCase
                 [
                     'center' => ['lat' => 48.8566, 'lng' => 2.3522],
                     'radius' => 500,
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => '<b>Circle around Paris</b>',
                         'content' => 'A circle with a radius of 500 meters around Paris.',
@@ -363,7 +359,6 @@ class MapTest extends TestCase
                 [
                     'center' => ['lat' => 45.764, 'lng' => 4.8357],
                     'radius' => 300,
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => '<b>Circle around Lyon</b>',
                         'content' => 'A circle with a radius of 300 meters around Lyon.',
@@ -380,7 +375,6 @@ class MapTest extends TestCase
                 [
                     'southWest' => ['lat' => 48.853, 'lng' => 2.3499],
                     'northEast' => ['lat' => 48.8566, 'lng' => 2.3522],
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => '<b>Rectangle around Paris</b>',
                         'content' => 'A rectangle around Paris.',
@@ -395,7 +389,6 @@ class MapTest extends TestCase
                 [
                     'southWest' => ['lat' => 45.75, 'lng' => 4.85],
                     'northEast' => ['lat' => 45.77, 'lng' => 4.82],
-                    'title' => null,
                     'infoWindow' => [
                         'headerContent' => '<b>Rectangle around Lyon</b>',
                         'content' => 'A rectangle around Lyon.',
@@ -416,15 +409,13 @@ class MapTest extends TestCase
         ], $map->toArray());
     }
 
-    /**
-     * @testWith [-1, null, null, "The \"minZoom\" must be greater than or equal to 0."]
-     *           [null, -1, null, "The \"zoom\" must be greater than or equal to 0."]
-     *           [null, null, -1, "The \"maxZoom\" must be greater than or equal to 0."]
-     *           [5, 2, null, "The \"zoom\" must be greater than or equal to \"minZoom\"."]
-     *           [null, 5, 2, "The \"zoom\" must be less than or equal to \"maxZoom\"."]
-     *           [2.1, null, 2.0, "The \"minZoom\" must be less than or equal to \"maxZoom\"."]
-     */
-    public function testZoomsValidation(?float $minZoom, ?float $zoom, ?float $maxZoom, string $expectedExceptionMessage)
+    #[TestWith([-1.0, null, null, 'The "minZoom" must be greater than or equal to 0.'])]
+    #[TestWith([null, -1.0, null, 'The "zoom" must be greater than or equal to 0.'])]
+    #[TestWith([null, null, -1.0, 'The "maxZoom" must be greater than or equal to 0.'])]
+    #[TestWith([5.0, 2.0, null, 'The "zoom" must be greater than or equal to "minZoom".'])]
+    #[TestWith([null, 5.0, 2.0, 'The "zoom" must be less than or equal to "maxZoom".'])]
+    #[TestWith([2.1, null, 2.0, 'The "minZoom" must be less than or equal to "maxZoom".'])]
+    public function testZoomsValidation(?float $minZoom, ?float $zoom, ?float $maxZoom, string $expectedExceptionMessage): void
     {
         self::expectException(InvalidArgumentException::class);
         self::expectExceptionMessage($expectedExceptionMessage);

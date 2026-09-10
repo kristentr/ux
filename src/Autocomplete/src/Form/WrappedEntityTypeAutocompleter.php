@@ -13,7 +13,6 @@ namespace Symfony\UX\Autocomplete\Form;
 
 use Doctrine\ORM\EntityRepository;
 use Doctrine\ORM\QueryBuilder;
-use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Form\ChoiceList\Factory\Cache\ChoiceLabel;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
@@ -32,6 +31,8 @@ use Symfony\UX\Autocomplete\OptionsAwareEntityAutocompleterInterface;
  */
 final class WrappedEntityTypeAutocompleter implements OptionsAwareEntityAutocompleterInterface, ResetInterface
 {
+    use WrappedAutocompleterTrait;
+
     private ?FormInterface $form = null;
     private ?EntityMetadata $entityMetadata = null;
     private array $options = [];
@@ -114,47 +115,44 @@ final class WrappedEntityTypeAutocompleter implements OptionsAwareEntityAutocomp
         return $this->getEntityMetadata()->getIdValue($entity);
     }
 
-    public function isGranted(Security $security): bool
-    {
-        $securityOption = $this->getForm()->getConfig()->getOption('security');
-
-        if (false === $securityOption) {
-            return true;
-        }
-
-        if (\is_string($securityOption)) {
-            return $security->isGranted($securityOption, $this);
-        }
-
-        if (\is_callable($securityOption)) {
-            return $securityOption($security);
-        }
-
-        throw new \InvalidArgumentException('Invalid passed to the "security" option: it must be the boolean true, a string role or a callable.');
-    }
-
     public function getGroupBy(): mixed
     {
         return $this->getFormOption('group_by');
     }
 
+    public function getAttributes(object $entity): array
+    {
+        $attributesOption = $this->getFormOption('additional_attributes');
+
+        if (null === $attributesOption) {
+            return [];
+        }
+
+        if (\is_array($attributesOption)) {
+            return $attributesOption;
+        }
+
+        if (\is_callable($attributesOption)) {
+            return $attributesOption($entity);
+        }
+
+        throw new \InvalidArgumentException('The "additional_attributes" option must be either an array or a callable.');
+    }
+
+    public function getTranslationDomain(): string|false|null
+    {
+        // the "choice_translation_domain" option is normalized to the form
+        // "translation_domain" when it is true, and to false when translation
+        // is disabled
+        return $this->getFormOption('choice_translation_domain');
+    }
+
     private function getFormOption(string $name): mixed
     {
         $form = $this->getForm();
-        // Remove when dropping support for ParentEntityAutocompleteType
-        $form = $form->has('autocomplete') ? $form->get('autocomplete') : $form;
         $formOptions = $form->getConfig()->getOptions();
 
         return $formOptions[$name] ?? null;
-    }
-
-    private function getForm(): FormInterface
-    {
-        if (null === $this->form) {
-            $this->form = $this->formFactory->create($this->formType, options: $this->options);
-        }
-
-        return $this->form;
     }
 
     private function getSearchableFields(): ?array
@@ -179,20 +177,5 @@ final class WrappedEntityTypeAutocompleter implements OptionsAwareEntityAutocomp
         }
 
         return $this->entityMetadata;
-    }
-
-    public function setOptions(array $options): void
-    {
-        if (null !== $this->form) {
-            throw new \LogicException('The options can only be set before the form is created.');
-        }
-
-        $this->options = $options;
-    }
-
-    public function reset(): void
-    {
-        unset($this->form);
-        $this->form = null;
     }
 }

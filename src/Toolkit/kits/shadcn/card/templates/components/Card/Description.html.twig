@@ -1,7 +1,9 @@
-{# @block content The descriptive text of the card #}
+{# @block content The descriptive text of the card. #}
 <div
-    class="{{ ('text-muted-foreground text-sm ' ~ attributes.render('class'))|tailwind_merge }}"
-    {{ attributes }}
+    data-slot="card-description"
+    {{ attributes.defaults({
+        class: 'text-sm text-muted-foreground'|tailwind_classes,
+    }) }}
 >
     {%- block content %}{% endblock -%}
 </div>

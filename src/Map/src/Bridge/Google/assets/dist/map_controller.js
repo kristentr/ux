@@ -1,4 +1,4 @@
-import { Loader } from "@googlemaps/js-api-loader";
+import { importLibrary, setOptions } from "@googlemaps/js-api-loader";
 import { Controller } from "@hotwired/stimulus";
 const IconTypes = {
 	Url: "url",
@@ -104,7 +104,6 @@ var _Class = class extends Controller {
 		const eventAfter = `${type}:after-create`;
 		return ({ definition }) => {
 			this.dispatchEvent(eventBefore, { definition });
-			if (typeof definition.rawOptions !== "undefined") console.warn(`[Symfony UX Map] The event "${eventBefore}" added a deprecated "rawOptions" property to the definition, it will be removed in a next major version, replace it with "bridgeOptions" instead.`, definition);
 			const drawing = factory({ definition });
 			this.dispatchEvent(eventAfter, {
 				[type]: drawing,
@@ -143,7 +142,6 @@ _Class.values = {
 	options: Object,
 	extra: Object
 };
-let _google;
 let _loading = false;
 let _loaded = false;
 let _onLoadedCallbacks = [];
@@ -160,26 +158,10 @@ var map_controller_default = class extends _Class {
 			return;
 		}
 		_loading = true;
-		_google = { maps: {} };
 		let { libraries = [], ...loaderOptions } = this.providerOptionsValue;
-		const loader = new Loader(loaderOptions);
+		setOptions(loaderOptions);
 		libraries = ["core", ...libraries.filter((library) => library !== "core")];
-		(await Promise.all(libraries.map((library) => loader.importLibrary(library)))).forEach((libraryImplementation, index) => {
-			if (typeof libraryImplementation !== "object" || libraryImplementation === null) return;
-			const library = libraries[index];
-			if ([
-				"marker",
-				"places",
-				"geometry",
-				"journeySharing",
-				"drawing",
-				"visualization"
-			].includes(library)) _google.maps[library] = libraryImplementation;
-			else _google.maps = {
-				..._google.maps,
-				...libraryImplementation
-			};
-		});
+		await Promise.all(libraries.map((library) => importLibrary(library)));
 		_loading = false;
 		_loaded = true;
 		onLoaded();
@@ -201,7 +183,7 @@ var map_controller_default = class extends _Class {
 		if (this.map && this.hasMaxZoomValue && this.maxZoomValue) this.map.setOptions({ maxZoom: this.maxZoomValue });
 	}
 	dispatchEvent(name, payload = {}) {
-		payload.google = _google;
+		payload.google = google;
 		this.dispatch(name, {
 			prefix: "ux:map",
 			detail: payload
@@ -213,7 +195,7 @@ var map_controller_default = class extends _Class {
 		options.mapTypeControl = typeof options.mapTypeControlOptions !== "undefined";
 		options.streetViewControl = typeof options.streetViewControlOptions !== "undefined";
 		options.fullscreenControl = typeof options.fullscreenControlOptions !== "undefined";
-		return new _google.maps.Map(this.element, {
+		return new google.maps.Map(this.element, {
 			center,
 			zoom,
 			minZoom,
@@ -223,12 +205,11 @@ var map_controller_default = class extends _Class {
 		});
 	}
 	doCreateMarker({ definition }) {
-		const { "@id": _id, position, title, infoWindow, icon, rawOptions = {}, bridgeOptions = {} } = definition;
-		const marker = new _google.maps.marker.AdvancedMarkerElement({
+		const { "@id": _id, position, title, infoWindow, icon, bridgeOptions = {} } = definition;
+		const marker = new google.maps.marker.AdvancedMarkerElement({
 			position,
 			title,
 			map: this.map,
-			...rawOptions,
 			...bridgeOptions
 		});
 		if (infoWindow) this.createInfoWindow({
@@ -237,7 +218,6 @@ var map_controller_default = class extends _Class {
 		});
 		if (icon) {
 			if (Object.prototype.hasOwnProperty.call(bridgeOptions, "content")) console.warn("[Symfony UX Map] Defining \"bridgeOptions.content\" for a marker with a custom icon is not supported and will be ignored.");
-			else if (Object.prototype.hasOwnProperty.call(rawOptions, "content")) console.warn("[Symfony UX Map] Defining \"rawOptions.content\" for a marker with a custom icon is not supported and will be ignored.");
 			this.doCreateIcon({
 				definition: icon,
 				element: marker
@@ -249,17 +229,12 @@ var map_controller_default = class extends _Class {
 		marker.map = null;
 	}
 	doCreatePolygon({ definition }) {
-		const { "@id": _id, points, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
-		const polygon = new _google.maps.Polygon({
+		const { "@id": _id, points, infoWindow, bridgeOptions = {} } = definition;
+		const polygon = new google.maps.Polygon({
 			paths: points,
 			map: this.map,
-			...rawOptions,
 			...bridgeOptions
 		});
-		/**
-		* @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-		*/
-		if (title) polygon.set("title", title);
 		if (infoWindow) this.createInfoWindow({
 			definition: infoWindow,
 			element: polygon
@@ -270,17 +245,12 @@ var map_controller_default = class extends _Class {
 		polygon.setMap(null);
 	}
 	doCreatePolyline({ definition }) {
-		const { "@id": _id, points, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
-		const polyline = new _google.maps.Polyline({
+		const { "@id": _id, points, infoWindow, bridgeOptions = {} } = definition;
+		const polyline = new google.maps.Polyline({
 			path: points,
 			map: this.map,
-			...rawOptions,
 			...bridgeOptions
 		});
-		/**
-		* @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-		*/
-		if (title) polyline.set("title", title);
 		if (infoWindow) this.createInfoWindow({
 			definition: infoWindow,
 			element: polyline
@@ -291,18 +261,13 @@ var map_controller_default = class extends _Class {
 		polyline.setMap(null);
 	}
 	doCreateCircle({ definition }) {
-		const { "@id": _id, center, radius, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
-		const circle = new _google.maps.Circle({
+		const { "@id": _id, center, radius, infoWindow, bridgeOptions = {} } = definition;
+		const circle = new google.maps.Circle({
 			center,
 			radius,
 			map: this.map,
-			...rawOptions,
 			...bridgeOptions
 		});
-		/**
-		* @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-		*/
-		if (title) circle.set("title", title);
 		if (infoWindow) this.createInfoWindow({
 			definition: infoWindow,
 			element: circle
@@ -313,17 +278,12 @@ var map_controller_default = class extends _Class {
 		circle.setMap(null);
 	}
 	doCreateRectangle({ definition }) {
-		const { northEast, southWest, title, infoWindow, rawOptions = {}, bridgeOptions = {} } = definition;
-		const rectangle = new _google.maps.Rectangle({
-			bounds: new _google.maps.LatLngBounds(southWest, northEast),
+		const { northEast, southWest, infoWindow, bridgeOptions = {} } = definition;
+		const rectangle = new google.maps.Rectangle({
+			bounds: new google.maps.LatLngBounds(southWest, northEast),
 			map: this.map,
-			...rawOptions,
 			...bridgeOptions
 		});
-		/**
-		* @deprecated since Symfony UX Map 2.29, will be removed in 3.0
-		*/
-		if (title) rectangle.set("title", title);
 		if (infoWindow) this.createInfoWindow({
 			definition: infoWindow,
 			element: rectangle
@@ -334,7 +294,7 @@ var map_controller_default = class extends _Class {
 		rectangle.setMap(null);
 	}
 	doCreateInfoWindow({ definition, element }) {
-		const { headerContent, content, opened, autoClose, rawOptions = {}, bridgeOptions = {} } = definition;
+		const { headerContent, content, opened, autoClose, bridgeOptions = {} } = definition;
 		let position = null;
 		if (element instanceof google.maps.Circle) position = element.getCenter();
 		else if (element instanceof google.maps.Rectangle) position = element.getBounds()?.getCenter() || null;
@@ -343,10 +303,9 @@ var map_controller_default = class extends _Class {
 			headerContent: this.createTextOrElement(headerContent),
 			content: this.createTextOrElement(content),
 			position,
-			...rawOptions,
 			...bridgeOptions
 		};
-		const infoWindow = new _google.maps.InfoWindow(infoWindowOptions);
+		const infoWindow = new google.maps.InfoWindow(infoWindowOptions);
 		element.addListener("click", (event) => {
 			if (autoClose) this.closeInfoWindowsExcept(infoWindow);
 			if (infoWindowOptions.position === null) infoWindow.setPosition(event.latLng);

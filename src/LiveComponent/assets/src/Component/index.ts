@@ -1,6 +1,7 @@
 import type { BackendAction, BackendInterface } from '../Backend/Backend';
 import type BackendRequest from '../Backend/BackendRequest';
 import BackendResponse from '../Backend/BackendResponse';
+import type { Download } from '../Backend/BackendResponse';
 import { findComponents, registerComponent, unregisterComponent } from '../ComponentRegistry';
 import { elementBelongsToThisComponent, getValueFromElement, htmlToElement } from '../dom_utils';
 import HookManager from '../HookManager';
@@ -13,6 +14,9 @@ import UnsyncedInputsTracker from './UnsyncedInputsTracker';
 import ValueStore from './ValueStore';
 
 declare const Turbo: any;
+
+// Must match BatchActionController::MAX_ACTIONS_PER_BATCH on the PHP side.
+export const MAX_ACTIONS_PER_BATCH = 50;
 
 type MaybePromise<T = void> = T | Promise<T>;
 
@@ -64,6 +68,8 @@ export default class Component {
     private pendingFiles: { [key: string]: HTMLInputElement } = {};
     /** Is a request waiting to be made? */
     private isRequestPending = false;
+    /** Once removed, the component is done: it must never talk to the server again. */
+    private isRemoved = false;
     /** Current "timeout" before the pending request should be sent. */
     private requestDebounceTimeout: number | null = null;
     private nextRequestPromise: Promise<BackendResponse>;
@@ -247,7 +253,53 @@ export default class Component {
         return typeof Turbo !== 'undefined' && !this.element.closest('[data-turbo="false"]');
     }
 
+    /**
+     * Ends the component on the page.
+     *
+     * Once the final render and its events have been processed, polling stops and the
+     * component leaves the registry. The element is then marked with `data-live-removing`
+     * and left in place, so the page can animate it out without a live component still
+     * answering for it.
+     *
+     * With no animation on `[data-live-removing]`, there is nothing to wait for and the
+     * element goes on the next frame.
+     */
+    private removeFromPage(): void {
+        this.isRemoved = true;
+        this.disconnect();
+
+        const element = this.element;
+
+        // the props are what makes this element a live component: dropping them keeps
+        // anything from re-hydrating it, here or on a later render
+        for (const name of element.getAttributeNames()) {
+            if (name.startsWith('data-live-') && name.endsWith('-value')) {
+                element.removeAttribute(name);
+            }
+        }
+
+        element.setAttribute('data-live-removing', '');
+
+        // a transition only exists once the attribute has been applied, so give the browser
+        // a frame to create it before asking what is running
+        requestAnimationFrame(() => {
+            const animations = (element.getAnimations?.({ subtree: true }) ?? [])
+                // an endless animation would keep the element on the page forever
+                .filter((animation) => animation.effect?.getComputedTiming().endTime !== Number.POSITIVE_INFINITY);
+
+            Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+                element.remove();
+            });
+        });
+    }
+
     private tryStartingRequest(): void {
+        if (this.isRemoved) {
+            // the element may still be on the page while it animates out, and it keeps its
+            // listeners until then: a click must not reach a component that is already gone
+            return;
+        }
+
         if (!this.backendRequest) {
             this.performRequest();
 
@@ -275,9 +327,14 @@ export default class Component {
             }
         }
 
+        // Cap each batch at MAX_ACTIONS_PER_BATCH; the overflow stays queued and
+        // ships in a follow-up request via the isRequestPending mechanism below.
+        const actionsToSend = this.pendingActions.slice(0, MAX_ACTIONS_PER_BATCH);
+        const remainingActions = this.pendingActions.slice(MAX_ACTIONS_PER_BATCH);
+
         const requestConfig = {
             props: this.valueStore.getOriginalProps(),
-            actions: this.pendingActions,
+            actions: actionsToSend,
             updated: this.valueStore.getDirtyProps(),
             children: {},
             updatedPropsFromParent: this.valueStore.getUpdatedPropsFromParent(),
@@ -294,24 +351,26 @@ export default class Component {
         );
         this.hooks.triggerHook('loading.state:started', this.element, this.backendRequest);
 
-        this.pendingActions = [];
+        this.pendingActions = remainingActions;
         this.valueStore.flushDirtyPropsToPending();
-        this.isRequestPending = false;
+        this.isRequestPending = remainingActions.length > 0;
 
         this.backendRequest.promise.then(async (response) => {
             const backendResponse = new BackendResponse(response);
-            const html = await backendResponse.getBody();
+            const headers = backendResponse.response.headers;
 
             // clear sent files inputs
             for (const input of Object.values(this.pendingFiles)) {
                 input.value = '';
             }
 
+            const html = await backendResponse.getBody();
+
             // if the response does not contain a component, render as an error
-            const headers = backendResponse.response.headers;
             if (
                 !headers.get('Content-Type')?.includes('application/vnd.live-component+html') &&
-                !headers.get('X-Live-Redirect')
+                !headers.get('X-Live-Redirect') &&
+                !headers.has('X-Live-Remove')
             ) {
                 const controls = { displayError: true };
                 this.valueStore.pushPendingPropsBackToDirty();
@@ -323,6 +382,21 @@ export default class Component {
 
                 this.backendRequest = null;
                 thisPromiseResolve(backendResponse);
+
+                return response;
+            }
+
+            // The render carries the usual LiveComponent instructions. Make this component
+            // terminal before processing them, so a synchronous event handler cannot start
+            // another request on the component that is about to leave.
+            if (backendResponse.isRemoved()) {
+                this.isRemoved = true;
+                this.processRerender(html, backendResponse);
+
+                this.backendRequest = null;
+                thisPromiseResolve(backendResponse);
+
+                this.removeFromPage();
 
                 return response;
             }
@@ -447,6 +521,21 @@ export default class Component {
                 })
             );
         });
+
+        // the render is done and the props are applied, so a download failing here must not
+        // take the whole request down with it
+        try {
+            const downloadUrl = backendResponse.getDownloadUrl();
+            const download = backendResponse.getDownload();
+
+            if (downloadUrl) {
+                triggerDownload({ url: downloadUrl });
+            } else if (download) {
+                triggerDownload(download);
+            }
+        } catch (error) {
+            console.error('Could not start the download:', error);
+        }
 
         this.hooks.triggerHook('render:finished', this);
     }
@@ -580,6 +669,14 @@ export function proxifyComponent(component: Component): Component {
                 return component.getData(prop);
             }
 
+            // protocol probes performed implicitly by JSON.stringify() ("toJSON") and
+            // by promise assimilation ("then", e.g. `await component`) must not be
+            // mistaken for actions: returning a callable would let those protocols
+            // invoke it, queueing a real server action of that name
+            if ('toJSON' === prop || 'then' === prop) {
+                return undefined;
+            }
+
             // try to call an action
             return (args: string[]) => {
                 return component.action.apply(component, [prop, args]);
@@ -599,4 +696,33 @@ export function proxifyComponent(component: Component): Component {
             return true;
         },
     });
+}
+
+/**
+ * Hands a file to the browser without leaving the page, either from a URL it fetches
+ * itself or from a blob carried in the response.
+ *
+ * The object URL is revoked on a delay: revoking it in the same tick can cancel the
+ * download in some browsers.
+ */
+function triggerDownload(download: Download | { url: string }): void {
+    const fromUrl = 'url' in download;
+    const href = fromUrl ? download.url : URL.createObjectURL(download.blob);
+    const link = Object.assign(document.createElement('a'), {
+        href,
+        // an empty download attribute keeps the name the server sends. Note it is ignored
+        // cross-origin, where the remote Content-Disposition decides instead
+        download: fromUrl ? '' : download.filename,
+        style: 'display: none',
+    });
+
+    document.body.appendChild(link);
+    link.click();
+
+    setTimeout(() => {
+        document.body.removeChild(link);
+        if (!fromUrl) {
+            URL.revokeObjectURL(href);
+        }
+    }, 75);
 }

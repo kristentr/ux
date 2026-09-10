@@ -1,12 +1,12 @@
-{# @prop orientation 'horizontal'|'vertical' The layout direction of the button group. Defaults to `horizontal` #}
-{# @block content The grouped buttons and/or separators #}
+{# @prop orientation 'horizontal'|'vertical' The layout direction of the button group. #}
+{# @block content The grouped buttons and/or separators. #}
 {%- props orientation = 'horizontal' -%}
 {%- set style = html_cva(
-    base: 'flex w-fit items-stretch [&>*]:focus-visible:z-10 [&>*]:focus-visible:relative [&>[data-slot=select-trigger]:not([class*=\'w-\'])]:w-fit [&>input]:flex-1 has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-md has-[>[data-slot=button-group]]:gap-2',
+    base: 'group/button-group flex w-fit items-stretch *:focus-visible:relative *:focus-visible:z-10 has-[>[data-slot=button-group]]:gap-2 ltr:has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-r-lg rtl:has-[select[aria-hidden=true]:last-child]:[&>[data-slot=select-trigger]:last-of-type]:rounded-e-lg [&>[data-slot=select-trigger]:not([class*=\'w-\'])]:w-fit [&>input]:flex-1 ',
     variants: {
         orientation: {
-            horizontal: '[&>*:not(:first-child)]:rounded-l-none [&>*:not(:first-child)]:border-l-0 [&>*:not(:last-child)]:rounded-r-none',
-            vertical: 'flex-col [&>*:not(:first-child)]:rounded-t-none [&>*:not(:first-child)]:border-t-0 [&>*:not(:last-child)]:rounded-b-none',
+            horizontal: 'ltr:[&>*:not(:first-child)]:rounded-l-none rtl:[&>*:not(:first-child)]:rounded-s-none ltr:[&>*:not(:first-child)]:border-l-0 rtl:[&>*:not(:first-child)]:border-s-0 ltr:[&>*:not(:last-child)]:rounded-r-none rtl:[&>*:not(:last-child)]:rounded-e-none ltr:[&>[data-slot]:not(:has(~[data-slot]))]:rounded-r-lg! rtl:[&>[data-slot]:not(:has(~[data-slot]))]:rounded-e-lg!',
+            vertical: 'flex-col [&>*:not(:first-child)]:rounded-t-none [&>*:not(:first-child)]:border-t-0 [&>*:not(:last-child)]:rounded-b-none [&>[data-slot]:not(:has(~[data-slot]))]:rounded-b-lg!',
         },
     },
     default_variant: {
@@ -18,8 +18,9 @@
     role="group"
     data-slot="button-group"
     data-orientation="{{ orientation }}"
-    class="{{ style.apply({orientation: orientation}, attributes.render('class'))|tailwind_merge }}"
-    {{ attributes }}
+    {{ attributes.defaults({
+        class: style.apply({orientation: orientation})|tailwind_classes,
+    }) }}
 >
     {%- block content %}{% endblock -%}
 </div>

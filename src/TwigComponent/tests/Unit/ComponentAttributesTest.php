@@ -11,12 +11,14 @@
 
 namespace Symfony\UX\TwigComponent\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
-use Symfony\Bridge\PhpUnit\ExpectDeprecationTrait;
 use Symfony\UX\StimulusBundle\Dto\StimulusAttributes;
 use Symfony\UX\TwigComponent\ComponentAttributes;
-use Symfony\WebpackEncoreBundle\Dto\AbstractStimulusDto;
 use Twig\Environment;
+use Twig\Extra\Html\HtmlAttr\AttributeValueInterface;
+use Twig\Extra\Html\HtmlAttr\InlineStyle;
+use Twig\Extra\Html\HtmlAttr\MergeableInterface;
 use Twig\Loader\ArrayLoader;
 use Twig\Runtime\EscaperRuntime;
 
@@ -25,9 +27,7 @@ use Twig\Runtime\EscaperRuntime;
  */
 final class ComponentAttributesTest extends TestCase
 {
-    use ExpectDeprecationTrait;
-
-    public function testCanConvertToString()
+    public function testCanConvertToString(): void
     {
         $attributes = new ComponentAttributes([
             'class' => 'foo',
@@ -44,7 +44,16 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame(' class="foo" style="color:black;" value="" autofocus', (string) $attributes);
     }
 
-    public function testCanSetDefaults()
+    public function testThrowsOnNullAttributeValue(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Attribute "data-foo" value cannot be null.');
+
+        $attributes = new ComponentAttributes(['data-foo' => null], new EscaperRuntime());
+        (string) $attributes;
+    }
+
+    public function testCanSetDefaults(): void
     {
         $attributes = new ComponentAttributes(['class' => 'foo', 'style' => 'color:black;'], new EscaperRuntime());
 
@@ -57,17 +66,122 @@ final class ComponentAttributesTest extends TestCase
             (string) $attributes->defaults(['class' => 'bar', 'style' => 'font-size: 10;'])
         );
 
-        $this->assertSame(['class' => 'foo'], (new ComponentAttributes([], new EscaperRuntime()))->defaults(['class' => 'foo'])->all());
+        $this->assertSame(['class' => 'foo'], new ComponentAttributes([], new EscaperRuntime())->defaults(['class' => 'foo'])->all());
     }
 
-    public function testCanGetOnly()
+    public function testDefaultsMergesMergeableDefaultViaAppendFrom(): void
+    {
+        if (!interface_exists(MergeableInterface::class)) {
+            $this->markTestSkipped('Requires twig/html-extra >= 3.24.');
+        }
+
+        // The component default is mergeable, the caller passed a plain "class".
+        $attributes = new ComponentAttributes(['class' => 'override'], new EscaperRuntime());
+
+        $merged = $attributes->defaults(['class' => $this->mergeableClasses('base-1', 'base-2')]);
+
+        // default (base) is on the left, caller (override) is appended on the right
+        $this->assertSame(' class="base-1 base-2 override"', (string) $merged);
+        $this->assertSame('base-1 base-2 override', $merged->render('class'));
+    }
+
+    public function testDefaultsMergesMergeableCallerViaMergeInto(): void
+    {
+        if (!interface_exists(MergeableInterface::class)) {
+            $this->markTestSkipped('Requires twig/html-extra >= 3.24.');
+        }
+
+        // The caller passed a mergeable "class", the component default is a plain string.
+        $attributes = new ComponentAttributes(['class' => $this->mergeableClasses('override')], new EscaperRuntime());
+
+        $merged = $attributes->defaults(['class' => 'base']);
+
+        $this->assertSame(' class="base override"', (string) $merged);
+    }
+
+    public function testRenderReturnsNullWhenMergeableValueResolvesToNull(): void
+    {
+        if (!interface_exists(MergeableInterface::class)) {
+            $this->markTestSkipped('Requires twig/html-extra >= 3.24.');
+        }
+
+        $attributes = new ComponentAttributes(['class' => $this->mergeableClasses()], new EscaperRuntime());
+
+        $this->assertNull($attributes->render('class'));
+    }
+
+    public function testDefaultsMergesMergeableDefaultOnNonSpecialKey(): void
+    {
+        if (!interface_exists(MergeableInterface::class)) {
+            $this->markTestSkipped('Requires twig/html-extra >= 3.24.');
+        }
+
+        // "data-foo" is not a special key, yet a mergeable default is merged
+        // instead of being overwritten by the caller's plain value.
+        $attributes = new ComponentAttributes(['data-foo' => 'caller'], new EscaperRuntime());
+
+        $merged = $attributes->defaults(['data-foo' => $this->mergeableClasses('base')]);
+
+        $this->assertSame('base caller', $merged->render('data-foo'));
+    }
+
+    public function testDefaultsMergesRealMergeableOnNonSpecialKey(): void
+    {
+        if (!class_exists(InlineStyle::class)) {
+            $this->markTestSkipped('Requires twig/html-extra >= 3.24.');
+        }
+
+        // Generalization with a real Twig HTML extra mergeable (InlineStyle) on "style":
+        // the caller value wins conflicts, appended after the default.
+        $attributes = new ComponentAttributes(['style' => new InlineStyle(['display: block'])], new EscaperRuntime());
+
+        $merged = $attributes->defaults(['style' => new InlineStyle(['color: red'])]);
+
+        $this->assertSame('color: red; display: block;', $merged->render('style'));
+    }
+
+    /**
+     * A minimal space-separated token list implementing the Twig HTML extra merge protocol,
+     * so these tests exercise ComponentAttributes routing without depending on a concrete
+     * implementation (e.g. tailwind_classes).
+     */
+    private function mergeableClasses(string ...$classes): object
+    {
+        return new class($classes) implements AttributeValueInterface, MergeableInterface {
+            /** @param list<string> $classes */
+            public function __construct(private array $classes)
+            {
+            }
+
+            public function getValue(): ?string
+            {
+                return $this->classes ? implode(' ', $this->classes) : null;
+            }
+
+            public function mergeInto(mixed $previous): mixed
+            {
+                $previousClasses = $previous instanceof self ? $previous->classes : array_filter([(string) $previous], 'strlen');
+
+                return new self([...$previousClasses, ...$this->classes]);
+            }
+
+            public function appendFrom(mixed $newValue): mixed
+            {
+                $newClasses = $newValue instanceof self ? $newValue->classes : array_filter([(string) $newValue], 'strlen');
+
+                return new self([...$this->classes, ...$newClasses]);
+            }
+        };
+    }
+
+    public function testCanGetOnly(): void
     {
         $attributes = new ComponentAttributes(['class' => 'foo', 'style' => 'color:black;'], new EscaperRuntime());
 
         $this->assertSame(['class' => 'foo'], $attributes->only('class')->all());
     }
 
-    public function testCanGetWithout()
+    public function testCanGetWithout(): void
     {
         $attributes = new ComponentAttributes(['class' => 'foo', 'style' => 'color:black;', 'data-foo' => 'bar'], new EscaperRuntime());
 
@@ -75,70 +189,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame(['class' => 'foo'], $attributes->without('style', 'data-foo')->all());
     }
 
-    /**
-     * @group legacy
-     */
-    public function testCanAddStimulusController()
-    {
-        if (!class_exists(AbstractStimulusDto::class)) {
-            $this->markTestSkipped('AbstractStimulusDto class does not exist, skipping test.');
-        }
-
-        $attributes = new ComponentAttributes([
-            'class' => 'foo',
-            'data-controller' => 'live',
-            'data-live-data-value' => '{}',
-        ], new EscaperRuntime());
-
-        $controllerDto = $this->createMock(AbstractStimulusDto::class);
-        $controllerDto->expects(self::once())
-            ->method('toArray')
-            ->willReturn([
-                'data-controller' => 'foo bar',
-                'data-foo-name-value' => 'ryan',
-            ]);
-
-        $attributes = $attributes->add($controllerDto);
-
-        $this->assertEquals([
-            'class' => 'foo',
-            'data-controller' => 'live foo bar',
-            'data-live-data-value' => '{}',
-            'data-foo-name-value' => 'ryan',
-        ], $attributes->all());
-    }
-
-    /**
-     * @group legacy
-     */
-    public function testCanAddStimulusControllerIfNoneAlreadyPresent()
-    {
-        if (!class_exists(AbstractStimulusDto::class)) {
-            $this->markTestSkipped('AbstractStimulusDto class does not exist, skipping test.');
-        }
-
-        $attributes = new ComponentAttributes([
-            'class' => 'foo',
-        ], new EscaperRuntime());
-
-        $controllerDto = $this->createMock(AbstractStimulusDto::class);
-        $controllerDto->expects(self::once())
-            ->method('toArray')
-            ->willReturn([
-                'data-controller' => 'foo bar',
-                'data-foo-name-value' => 'ryan',
-            ]);
-
-        $attributes = $attributes->add($controllerDto);
-
-        $this->assertEquals([
-            'class' => 'foo',
-            'data-controller' => 'foo bar',
-            'data-foo-name-value' => 'ryan',
-        ], $attributes->all());
-    }
-
-    public function testCanAddStimulusControllerViaStimulusAttributes()
+    public function testCanAddStimulusControllerViaStimulusAttributes(): void
     {
         $attributes = new ComponentAttributes([
             'class' => 'foo',
@@ -161,7 +212,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame(' data-controller="foo live" data-foo-name-value="ryan" data-foo-some-array-value="[&quot;a&quot;,&quot;b&quot;]" data-foo-some-array-with-keys-value="{&quot;key1&quot;:&quot;value1&quot;,&quot;key2&quot;:&quot;value2&quot;}" class="foo" data-live-data-value="{}"', (string) $attributes);
     }
 
-    public function testCanAddStimulusActionViaStimulusAttributes()
+    public function testCanAddStimulusActionViaStimulusAttributes(): void
     {
         $attributes = new ComponentAttributes([
             'class' => 'foo',
@@ -179,7 +230,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame(' data-action="foo#barMethod live#foo" class="foo"', (string) $attributes);
     }
 
-    public function testBooleanBehaviour()
+    public function testBooleanBehaviour(): void
     {
         $attributes = new ComponentAttributes(['disabled' => true], new EscaperRuntime());
 
@@ -192,18 +243,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame('', (string) $attributes);
     }
 
-    /**
-     * @group legacy
-     */
-    public function testNullBehaviour()
-    {
-        $attributes = new ComponentAttributes(['disabled' => null], new EscaperRuntime());
-
-        $this->assertSame(['disabled' => null], $attributes->all());
-        $this->assertSame(' disabled', (string) $attributes);
-    }
-
-    public function testIsTraversableAndCountable()
+    public function testIsTraversableAndCountable(): void
     {
         $attributes = new ComponentAttributes(['foo' => 'bar'], new EscaperRuntime());
 
@@ -211,7 +251,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertCount(1, $attributes);
     }
 
-    public function testRenderSingleAttribute()
+    public function testRenderSingleAttribute(): void
     {
         $attributes = new ComponentAttributes(['attr1' => 'value1', 'attr2' => 'value2'], new EscaperRuntime());
 
@@ -219,7 +259,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertNull($attributes->render('attr3'));
     }
 
-    public function testRenderingSingleAttributeExcludesFromString()
+    public function testRenderingSingleAttributeExcludesFromString(): void
     {
         $attributes = new ComponentAttributes([
             'attr1' => new class {
@@ -235,7 +275,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame(' attr2="value2"', (string) $attributes);
     }
 
-    public function testCannotRenderNonStringAttribute()
+    public function testCannotRenderNonStringAttribute(): void
     {
         $attributes = new ComponentAttributes(['attr1' => false], new EscaperRuntime());
 
@@ -244,14 +284,14 @@ final class ComponentAttributesTest extends TestCase
         $attributes->render('attr1');
     }
 
-    public function testCanCheckIfAttributeExists()
+    public function testCanCheckIfAttributeExists(): void
     {
         $attributes = new ComponentAttributes(['foo' => 'bar'], new EscaperRuntime());
 
         $this->assertTrue($attributes->has('foo'));
     }
 
-    public function testNestedAttributes()
+    public function testNestedAttributes(): void
     {
         $attributes = new ComponentAttributes([
             'class' => 'foo',
@@ -265,7 +305,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame('', (string) $attributes->nested('invalid'));
     }
 
-    public function testPrefixedAttributes()
+    public function testPrefixedAttributes(): void
     {
         $attributes = new ComponentAttributes([
             'x-click' => 'x+',
@@ -278,7 +318,7 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame('', (string) $attributes->nested('invalid'));
     }
 
-    public function testConvertTrueAriaAttributeValue()
+    public function testConvertTrueAriaAttributeValue(): void
     {
         $attributes = new ComponentAttributes([
             'aria-bar' => false,
@@ -306,10 +346,8 @@ final class ComponentAttributesTest extends TestCase
         $attributes->render('aria-bar');
     }
 
-    /**
-     * @dataProvider provideSpecialSyntaxAttributeNames
-     */
-    public function testAllowsSpecialSyntaxAttributeNames(string $name)
+    #[DataProvider('provideSpecialSyntaxAttributeNames')]
+    public function testAllowsSpecialSyntaxAttributeNames(string $name): void
     {
         $attributes = new ComponentAttributes([$name => 'value'], new EscaperRuntime());
 
@@ -326,16 +364,14 @@ final class ComponentAttributesTest extends TestCase
         yield ['@input.debounce.500ms'];
     }
 
-    public function testThrowsTypeErrorWithoutEscaperRuntime()
+    public function testThrowsTypeErrorWithoutEscaperRuntime(): void
     {
         $this->expectException(\TypeError::class);
         new ComponentAttributes([]);
     }
 
-    /**
-     * @dataProvider nameProvider
-     */
-    public function testEscapeName(string $input, string $expected)
+    #[DataProvider('nameProvider')]
+    public function testEscapeName(string $input, string $expected): void
     {
         $runtime = new EscaperRuntime();
         $attributes = new ComponentAttributes([$input => 'foo'], $runtime);
@@ -343,10 +379,8 @@ final class ComponentAttributesTest extends TestCase
         $this->assertSame(' '.$expected.'="foo"', (string) $attributes);
     }
 
-    /**
-     * @dataProvider valueProvider
-     */
-    public function testEscapeValue(string $input, string $expected)
+    #[DataProvider('valueProvider')]
+    public function testEscapeValue(string $input, string $expected): void
     {
         $runtime = new EscaperRuntime();
         $attributes = new ComponentAttributes(['foo' => $input], $runtime);

@@ -1,6 +1,6 @@
-# Create a non-exiting version of _run_task for sequential execution
-# This is used to run the tests sequentially on Windows
-# because parallel is not available on Windows.
+# Runs a single task ($1 = title, $2 = command) and buffers its output into one
+# grouped block. Returns the command's exit code instead of exiting, so it can be
+# reused both by the parallel pool (_run_package_tests) and by _run_task.
 _run_task_sequential() {
     local ok=0
     local title="$1"
@@ -29,75 +29,46 @@ _run_task() {
 }
 export -f _run_task
 
-before_composer_install() {
-  local component=$1
-  local php_version=$2
-  local symfony_version=$3
+# Run every package in $PACKAGES through its test command with bounded parallelism.
+# Output is buffered per package and printed once all have finished, so grouped logs
+# stay readable. Relies only on Bash job control, so it behaves the same on Linux and
+# on Windows (Git Bash) — unlike GNU parallel, which is missing from Windows runners.
+_run_package_tests() {
+    # Default matches the previous "parallel -j +3": as many jobs as CPUs, plus 3.
+    local max_jobs="${1:-$(( $(nproc 2>/dev/null || echo 4) + 3 ))}"
+    local logs
+    logs="$(mktemp -d)"
+    local pkg safe rc=0
 
-  # Install specific versions of PropertyInfo and TypeInfo based on PHP version
-  # To remove in Symfony UX 4.0
-  if [[ "$component" == "LiveComponent" ]]; then
-    case "$php_version" in
-      8.1)
-        # no-op, let Composer install the best PropertyInfo version (defined in composer.json), but do not require TypeInfo
-        return 0
-        ;;
-      8.2)
-        # PropertyInfo 7.1 (experimental PropertyTypeExtractorInterface::getType) and TypeInfo 7.2 (lowest non-experimental)
-        composer require symfony/property-info:7.1.* symfony/type-info:7.2.* --no-update
-        return $?
-        ;;
-      8.3)
-        # Install PropertyInfo 7.3 (deprecate PropertyTypeExtractorInterface::getTypes) and TypeInfo 7.3 (new features and deprecations)
-        composer require symfony/property-info:7.3.* symfony/type-info:7.3.* --no-update
-        return $?
-        ;;
-    esac
+    for pkg in $PACKAGES; do
+        # Throttle: wait for a running job to finish before starting the next package.
+        # "|| :" keeps errexit (bash -e) from aborting on a failed job's exit code;
+        # failures are collected from the .rc files during replay instead.
+        while [ "$(jobs -rp | wc -l)" -ge "$max_jobs" ]; do wait -n || :; done
+        # Bridge packages carry slashes (e.g. Map/src/Bridge/Google), so flatten
+        # them into a single path segment for the temp file names.
+        safe="${pkg//\//_}"
+        # Run in the background, capturing the package's output and exit code to files
+        # so the parallel logs can be replayed in a stable order below. "|| code=$?"
+        # is required: under errexit a failing task would otherwise abort the subshell
+        # before its exit code is recorded.
+        {
+            code=0
+            _run_task_sequential "$pkg" \
+                "(cd src/$pkg && $COMPOSER_MIN_STAB && $COMPOSER_UP && $PHPUNIT)" || code=$?
+            echo "$code" > "$logs/$safe.rc"
+        } > "$logs/$safe.log" 2>&1 &
+    done
+    wait
 
-    # Install the best TypeInfo version available
-    composer require symfony/type-info --no-update
-  fi
+    # Replay each package's log in order, failing the step if any package exited non-zero.
+    for pkg in $PACKAGES; do
+        safe="${pkg//\//_}"
+        cat "$logs/$safe.log"
+        [ "$(cat "$logs/$safe.rc" 2>/dev/null || echo 1)" = 0 ] || rc=1
+    done
 
-  # When testing with Symfony 8 and PHP 8.4+, we have issue with spatie/phpunit-snapshot-assertions:
-  # - version ^4 is not compatible with Symfony 8
-  # - version ^5 is compatible with Symfony 8, but requires PHPUnit 10+
-  # PHPUnit 10+ is not really "usable", it's not compatible with PHPUnit Bridge, and there is no native deprecations handling.
-  # To remove in Symfony UX 3.0
-  if [[ "$symfony_version" == "8.0.*" ]]; then
-    if grep -q '"spatie/phpunit-snapshot-assertions"' composer.json; then
-      composer remove symfony/phpunit-bridge --dev --no-update
-      composer require phpunit/phpunit:^11 --dev --no-update
-      cp phpunit11.dist.xml phpunit.dist.xml
-      if [ ! -f tests/bootstrap.php ]; then
-        cat > tests/bootstrap.php <<'PHP'
-<?php
-
-use Symfony\Component\ErrorHandler\ErrorHandler;
-use Symfony\Component\Filesystem\Filesystem;
-
-require __DIR__.'/../vendor/autoload.php';
-
-// @see https://github.com/symfony/symfony/issues/53812
-ErrorHandler::register(null, false);
-PHP
-      fi
-    fi
-  fi
+    rm -rf "$logs"
+    return "$rc"
 }
-export -f before_composer_install
-
-after_composer_install() {
-  local component=$1
-  local php_version=$2
-  local symfony_version=$3
-
-  # To remove in Symfony UX 3.0
-  if [[ "$symfony_version" == "8.0.*" ]]; then
-    if grep -q '"spatie/phpunit-snapshot-assertions"' composer.json; then
-      # The Symfony PHPUnit bridge was previously removed to allow PHPUnit 11 installation.
-      # Creating a symlink to "phpunit" as "simple-phpunit" makes things easier for unit-tests.yaml workflow.
-      ln -s phpunit vendor/bin/simple-phpunit
-    fi
-  fi
-}
-export -f after_composer_install
+export -f _run_package_tests

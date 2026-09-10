@@ -11,25 +11,22 @@
 
 namespace Symfony\UX\TwigComponent\Tests\Unit;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\TwigComponent\Twig\TwigPreLexer;
 use Twig\Error\SyntaxError;
 
 final class TwigPreLexerTest extends TestCase
 {
-    /**
-     * @dataProvider getLexTests
-     */
-    public function testPreLex(string $input, string $expectedOutput)
+    #[DataProvider('getLexTests')]
+    public function testPreLex(string $input, string $expectedOutput): void
     {
         $lexer = new TwigPreLexer();
         $this->assertSame($expectedOutput, $lexer->preLexComponents($input));
     }
 
-    /**
-     * @dataProvider getInvalidSyntaxTests
-     */
-    public function testPreLexThrowsExceptionOnInvalidSyntax(string $input, string $expectedMessage)
+    #[DataProvider('getInvalidSyntaxTests')]
+    public function testPreLexThrowsExceptionOnInvalidSyntax(string $input, string $expectedMessage): void
     {
         $this->expectException(SyntaxError::class);
         $this->expectExceptionMessage($expectedMessage);
@@ -43,6 +40,21 @@ final class TwigPreLexerTest extends TestCase
         yield 'component_with_unclosed_block' => [
             '<twig:foo name="bar">{% block a %}</twig:foo>',
             'Expected closing tag "</twig:foo>" not found at line 1.',
+        ];
+
+        yield 'dynamic_component_empty_is' => [
+            '<twig:component is="" />',
+            'The "is" attribute of "<twig:component>" must not be empty',
+        ];
+
+        yield 'dynamic_component_empty_dynamic_is' => [
+            '<twig:component :is="" />',
+            'The ":is" attribute of "<twig:component>" must not be empty',
+        ];
+
+        yield 'dynamic_component_static_is_with_empty_twig_expression' => [
+            '<twig:component is="{{ }}" />',
+            'The "is" attribute of "<twig:component>" must not be empty',
         ];
     }
 
@@ -96,6 +108,52 @@ final class TwigPreLexerTest extends TestCase
         yield 'component_with_embedded_component_inside_block' => [
             '<twig:foo><twig:block name="foo_block"><twig:bar><twig:baz /></twig:bar></twig:block></twig:foo>',
             '{% component \'foo\' %}{% block foo_block %}{% component \'bar\' %}{% block content %}{{ component(\'baz\') }}{% endblock %}{% endcomponent %}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name' => [
+            '<twig:foo><twig:block name="foo_block"><twig:blockquote>Quote</twig:blockquote></twig:block></twig:foo>',
+            '{% component \'foo\' %}{% block foo_block %}{% component \'blockquote\' %}{% block content %}Quote{% endblock %}{% endcomponent %}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name_self_closing' => [
+            '<twig:foo><twig:block name="foo_block"><twig:blockquote /></twig:block></twig:foo>',
+            '{% component \'foo\' %}{% block foo_block %}{{ component(\'blockquote\') }}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name_with_dash' => [
+            '<twig:foo><twig:block name="foo_block"><twig:block-title /></twig:block></twig:foo>',
+            '{% component \'foo\' %}{% block foo_block %}{{ component(\'block-title\') }}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name_with_colon' => [
+            '<twig:foo><twig:block name="foo_block"><twig:block:title /></twig:block></twig:foo>',
+            '{% component \'foo\' %}{% block foo_block %}{{ component(\'block:title\') }}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name_with_suffix' => [
+            '<twig:foo><twig:block name="foo_block"><twig:blocked /></twig:block></twig:foo>',
+            '{% component \'foo\' %}{% block foo_block %}{{ component(\'blocked\') }}{% endblock %}{% endcomponent %}',
+        ];
+
+        // a traditional block does not pre-lex the components nested in it, hence the verbatim tag
+        yield 'block_prefixed_component_name_in_traditional_block' => [
+            '<twig:foo>{% block foo_block %}<twig:blockquote />{% endblock %}</twig:foo>',
+            '{% component \'foo\' %}{% block foo_block %}<twig:blockquote />{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name_capitalized' => [
+            '<twig:foo><twig:block name="foo_block"><twig:Blockquote /></twig:block></twig:foo>',
+            '{% component \'foo\' %}{% block foo_block %}{{ component(\'Blockquote\') }}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name_outside_block' => [
+            '<twig:foo><twig:blockquote /></twig:foo>',
+            '{% component \'foo\' %}{% block content %}{{ component(\'blockquote\') }}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'block_prefixed_component_name_around_a_real_nested_block' => [
+            '<twig:foo><twig:block name="a"><twig:blockquote /><twig:bar><twig:block name="b">x</twig:block></twig:bar></twig:block></twig:foo>',
+            '{% component \'foo\' %}{% block a %}{{ component(\'blockquote\') }}{% component \'bar\' %}{% block b %}x{% endblock %}{% endcomponent %}{% endblock %}{% endcomponent %}',
         ];
 
         yield 'component_with_embedded_component' => [
@@ -351,6 +409,71 @@ final class TwigPreLexerTest extends TestCase
             '{% verbatim %}<twig:Alert/>{% endverbatim %}',
         ];
 
+        yield 'ignore_content_of_verbatim_block_with_whitespace_trim' => [
+            '{%- verbatim -%}<twig:Alert/>{%- endverbatim -%}',
+            '{%- verbatim -%}<twig:Alert/>{%- endverbatim -%}',
+        ];
+
+        yield 'ignore_content_of_verbatim_block_with_line_trim' => [
+            '{%~ verbatim ~%}<twig:Alert/>{%~ endverbatim ~%}',
+            '{%~ verbatim ~%}<twig:Alert/>{%~ endverbatim ~%}',
+        ];
+
+        yield 'ignore_content_of_verbatim_block_without_spaces' => [
+            '{%verbatim%}<twig:Alert/>{%endverbatim%}',
+            '{%verbatim%}<twig:Alert/>{%endverbatim%}',
+        ];
+
+        yield 'ignore_content_of_verbatim_block_with_extra_spaces' => [
+            '{%   verbatim   %}<twig:Alert/>{%   endverbatim   %}',
+            '{%   verbatim   %}<twig:Alert/>{%   endverbatim   %}',
+        ];
+
+        yield 'ignore_content_of_verbatim_block_with_newlines_in_tags' => [
+            "{%\nverbatim\n%}<twig:Alert/>{%\nendverbatim\n%}",
+            "{%\nverbatim\n%}<twig:Alert/>{%\nendverbatim\n%}",
+        ];
+
+        yield 'ignore_content_of_verbatim_block_with_mixed_delimiters' => [
+            '{%- verbatim %}<twig:Alert/>{% endverbatim -%}',
+            '{%- verbatim %}<twig:Alert/>{% endverbatim -%}',
+        ];
+
+        yield 'verbatim_block_as_the_whole_component_content' => [
+            '<twig:foo>{% verbatim %}<twig:Alert/>{% endverbatim %}</twig:foo>',
+            '{% component \'foo\' %}{% block content %}{% verbatim %}<twig:Alert/>{% endverbatim %}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'verbatim_block_after_text_in_a_component' => [
+            '<twig:foo>a{% verbatim %}<twig:Alert/>{% endverbatim %}</twig:foo>',
+            '{% component \'foo\' %}{% block content %}a{% verbatim %}<twig:Alert/>{% endverbatim %}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'ignore_comment_like_token_inside_output_expression' => [
+            "There are {{ '{count, plural, one {# item} other {# items}}'|trans({'count': 42}) }}!\n<twig:Alert/>",
+            "There are {{ '{count, plural, one {# item} other {# items}}'|trans({'count': 42}) }}!\n{{ component('Alert') }}",
+        ];
+
+        yield 'ignore_double_close_inside_string_in_output_expression' => [
+            '{{ "}}" }} <twig:Alert/>',
+            '{{ "}}" }} {{ component(\'Alert\') }}',
+        ];
+
+        yield 'ignore_comment_like_token_inside_double_quoted_string' => [
+            '{{ "{# not a comment #}" }} <twig:Alert/>',
+            '{{ "{# not a comment #}" }} {{ component(\'Alert\') }}',
+        ];
+
+        yield 'preserve_escaped_quote_inside_output_expression' => [
+            "{{ 'it\\'s }}' }} <twig:Alert/>",
+            "{{ 'it\\'s }}' }} {{ component('Alert') }}",
+        ];
+
+        yield 'output_expression_inside_component_opens_default_block' => [
+            '<twig:Foo>{{ bar }}</twig:Foo>',
+            "{% component 'Foo' %}{% block content %}{{ bar }}{% endblock %}{% endcomponent %}",
+        ];
+
         yield 'component_attr_spreading_self_closing' => [
             '<twig:foobar bar="baz"{{...attr}}/>',
             '{{ component(\'foobar\', { bar: \'baz\', ...attr }) }}',
@@ -417,6 +540,131 @@ final class TwigPreLexerTest extends TestCase
                 TWIG,
             '{{ component(\'foo\', { bar: \'# bar\' }) }}',
         ];
+        yield 'dynamic_component_self_closing_static_is' => [
+            '<twig:component is="Alert" />',
+            '{{ component(\'Alert\') }}',
+        ];
+
+        yield 'dynamic_component_self_closing_static_is_with_attributes' => [
+            '<twig:component is="Alert" type="success" />',
+            '{{ component(\'Alert\', { type: \'success\' }) }}',
+        ];
+
+        yield 'dynamic_component_self_closing_dynamic_is' => [
+            '<twig:component :is="componentName" />',
+            '{{ component(componentName) }}',
+        ];
+
+        yield 'dynamic_component_self_closing_dynamic_is_with_attributes' => [
+            '<twig:component :is="componentName" type="success" />',
+            '{{ component(componentName, { type: \'success\' }) }}',
+        ];
+
+        yield 'dynamic_component_self_closing_is_with_twig_expression' => [
+            '<twig:component is="{{ componentName }}" />',
+            '{{ component(componentName) }}',
+        ];
+
+        yield 'dynamic_component_self_closing_is_with_twig_expression_and_attributes' => [
+            '<twig:component is="{{ componentName }}" type="success" />',
+            '{{ component(componentName, { type: \'success\' }) }}',
+        ];
+
+        yield 'dynamic_component_paired_static_is' => [
+            '<twig:component is="Alert">content</twig:component>',
+            '{% component \'Alert\' %}{% block content %}content{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_paired_dynamic_is' => [
+            '<twig:component :is="componentName">content</twig:component>',
+            '{% component (componentName) %}{% block content %}content{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_paired_dynamic_is_with_attributes' => [
+            '<twig:component :is="componentName" type="success">content</twig:component>',
+            '{% component (componentName) with { type: \'success\' } %}{% block content %}content{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_paired_is_with_twig_expression' => [
+            '<twig:component is="{{ componentName }}">content</twig:component>',
+            '{% component (componentName) %}{% block content %}content{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_paired_dynamic_is_with_block' => [
+            '<twig:component :is="componentName"><twig:block name="footer">footer content</twig:block></twig:component>',
+            '{% component (componentName) %}{% block footer %}footer content{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_dynamic_is_expression' => [
+            '<twig:component :is="prefix ~ i" />',
+            '{{ component(prefix ~ i) }}',
+        ];
+
+        yield 'dynamic_component_without_is_treated_as_regular_component' => [
+            '<twig:component foo="bar" />',
+            '{{ component(\'component\', { foo: \'bar\' }) }}',
+        ];
+
+        yield 'dynamic_component_without_is_no_attributes' => [
+            '<twig:component />',
+            '{{ component(\'component\') }}',
+        ];
+
+        yield 'dynamic_component_nested_inside_other_component' => [
+            '<twig:foo><twig:component :is="componentName" /></twig:foo>',
+            '{% component \'foo\' %}{% block content %}{{ component(componentName) }}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_with_dynamic_attribute' => [
+            '<twig:component :is="componentName" :myProp="someVar" />',
+            '{{ component(componentName, { myProp: someVar }) }}',
+        ];
+
+        yield 'dynamic_component_with_boolean_attribute' => [
+            '<twig:component :is="componentName" disabled />',
+            '{{ component(componentName, { disabled: true }) }}',
+        ];
+
+        yield 'dynamic_component_with_spread_attributes' => [
+            '<twig:component :is="componentName" {{...attrs}} />',
+            '{{ component(componentName, { ...attrs }) }}',
+        ];
+
+        yield 'dynamic_component_paired_static_is_with_attributes' => [
+            '<twig:component is="Alert" type="success">content</twig:component>',
+            '{% component \'Alert\' with { type: \'success\' } %}{% block content %}content{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_dynamic_is_array_access' => [
+            '<twig:component :is="components[0]" />',
+            '{{ component(components[0]) }}',
+        ];
+
+        yield 'dynamic_component_dynamic_is_property_access' => [
+            '<twig:component :is="config.component" />',
+            '{{ component(config.component) }}',
+        ];
+
+        yield 'dynamic_component_dynamic_is_ternary' => [
+            '<twig:component :is="condition ? \'Alert\' : \'Warning\'" />',
+            '{{ component(condition ? \'Alert\' : \'Warning\') }}',
+        ];
+
+        yield 'dynamic_component_paired_with_nested_component' => [
+            '<twig:component :is="outer"><twig:component :is="inner" /></twig:component>',
+            '{% component (outer) %}{% block content %}{{ component(inner) }}{% endblock %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_paired_empty' => [
+            '<twig:component :is="componentName"></twig:component>',
+            '{% component (componentName) %}{% endcomponent %}',
+        ];
+
+        yield 'dynamic_component_with_dashed_attribute' => [
+            '<twig:component :is="componentName" data-action="foo#bar" />',
+            '{{ component(componentName, { \'data-action\': \'foo#bar\' }) }}',
+        ];
+
         yield 'component_with_comment_line_in_argument_array_value_is_kept' => [
             <<<TWIG
                 <twig:foo

@@ -41,7 +41,7 @@ class CreateKitCommandTest extends KernelTestCase
         $this->filesystem->remove($this->tmpDir);
     }
 
-    public function testShouldBeAbleToCreateAKit()
+    public function testShouldBeAbleToCreateAKit(): void
     {
         $this->bootKernel();
         $this->consoleCommand('ux:toolkit:create-kit')
@@ -71,15 +71,15 @@ class CreateKitCommandTest extends KernelTestCase
                 {
                     "$schema": "../vendor/symfony/ux-toolkit/schema-kit-recipe-v1.json",
                     "name": "Button",
-                    "description": "A clickable element that triggers actions or events, supporting various styles and states.",
                     "copy-files": {
                         "templates/": "templates/"
                     },
                     "dependencies": {
                         "composer": [
                             "twig/extra-bundle",
-                            "twig/html-extra:^3.12.0",
-                            "tales-from-a-dev/twig-tailwind-extra:^1.0.0"
+                            "twig/html-extra:^3.24.0",
+                            "symfony/ux-twig-component:^3.5",
+                            "tales-from-a-dev/twig-tailwind-extra:^1.3.0"
                         ]
                     }
                 }
@@ -100,12 +100,59 @@ class CreateKitCommandTest extends KernelTestCase
                 ) -%}
 
                 <button
-                    class="{{ style.apply({ variant }, attributes.render('class'))|tailwind_merge }}"
-                    {{ attributes.defaults({ type: 'submit'}) }}
+                    {{ attributes.defaults({
+                        class: style.apply({ variant })|tailwind_classes,
+                        type: 'submit',
+                    }) }}
                 >
                     {%- block content %}{% endblock -%}
                 </button>
                 TWIG
+        );
+        $this->assertStringEqualsFile(
+            $this->tmpDir.'/Button/README.md',
+            <<<'MARKDOWN'
+                # Button
+
+                Displays a button or a component that looks like a button.
+
+                ```twig {"preview":true}
+                <div class="flex flex-wrap gap-2">
+                    <twig:Button>Button</twig:Button>
+                    <twig:Button variant="secondary">Secondary</twig:Button>
+                </div>
+                ```
+
+                ## Installation
+
+                ::: installation
+
+                ## Usage
+
+                ```twig
+                <twig:Button variant="default | secondary">
+                    Button
+                </twig:Button>
+                ```
+
+                ## Examples
+
+                ### Variants
+
+                Use the `variant` prop to change the visual style of the button.
+
+                ```twig {"preview":true}
+                <div class="flex flex-wrap gap-2">
+                    <twig:Button>Default</twig:Button>
+                    <twig:Button variant="secondary">Secondary</twig:Button>
+                </div>
+                ```
+
+                ## API Reference
+
+                ::: api-reference
+
+                MARKDOWN
         );
     }
 }

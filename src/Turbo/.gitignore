@@ -1,11 +1,8 @@
 /assets/node_modules/
 /config/reference.php
+/config/schema.json
 /vendor/
 /composer.lock
 /drivers/
 /phpunit.xml
-/.phpunit.result.cache
-/tests/app/assets/vendor/
-/tests/app/public/assets/
-/tests/app/public/build/
-/tests/app/var/
+/.phpunit.cache

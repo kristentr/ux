@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Symfony package.
  *
@@ -13,6 +11,7 @@ declare(strict_types=1);
 
 namespace Symfony\UX\Map\Tests\Renderer;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Map\Exception\LogicException;
 use Symfony\UX\Map\Map;
@@ -41,10 +40,8 @@ final class NullRendererTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider provideTestRenderMap
-     */
-    public function testRenderMap(string $expectedExceptionMessage, RendererInterface $renderer)
+    #[DataProvider('provideTestRenderMap')]
+    public function testRenderMap(string $expectedExceptionMessage, RendererInterface $renderer): void
     {
         self::expectException(LogicException::class);
         self::expectExceptionMessage($expectedExceptionMessage);

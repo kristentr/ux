@@ -13,7 +13,6 @@ namespace Symfony\UX\Autocomplete\Tests\Fixtures;
 
 use Composer\InstalledVersions;
 use Doctrine\Bundle\DoctrineBundle\DoctrineBundle;
-use Doctrine\ORM\Mapping\AssociationMapping;
 use Psr\Log\NullLogger;
 use Symfony\Bundle\FrameworkBundle\FrameworkBundle;
 use Symfony\Bundle\FrameworkBundle\Kernel\MicroKernelTrait;
@@ -35,7 +34,9 @@ use Symfony\UX\Autocomplete\AutocompleteBundle;
 use Symfony\UX\Autocomplete\DependencyInjection\AutocompleteFormTypePass;
 use Symfony\UX\Autocomplete\Tests\Fixtures\Autocompleter\CustomAttributesProductAutocompleter;
 use Symfony\UX\Autocomplete\Tests\Fixtures\Autocompleter\CustomGroupByProductAutocompleter;
+use Symfony\UX\Autocomplete\Tests\Fixtures\Autocompleter\CustomGroupByTranslatedProductAutocompleter;
 use Symfony\UX\Autocomplete\Tests\Fixtures\Autocompleter\CustomProductAutocompleter;
+use Symfony\UX\Autocomplete\Tests\Fixtures\Autocompleter\InMemoryColorAutocompleter;
 use Symfony\UX\Autocomplete\Tests\Fixtures\Form\CategoryWithCallbackAsCustomValue;
 use Symfony\UX\Autocomplete\Tests\Fixtures\Form\CategoryWithPropertyNameAsCustomValue;
 use Symfony\UX\Autocomplete\Tests\Fixtures\Form\ProductType;
@@ -77,12 +78,12 @@ final class Kernel extends BaseKernel
     protected function build(ContainerBuilder $container): void
     {
         // workaround https://github.com/symfony/symfony/issues/50322
-        $container->addCompilerPass(new class() implements CompilerPassInterface {
+        $container->addCompilerPass(new class implements CompilerPassInterface {
             public function process(ContainerBuilder $container): void
             {
                 $container->removeDefinition('doctrine.orm.listeners.pdo_session_handler_schema_listener');
 
-                if (\PHP_VERSION_ID >= 80400 && $container->hasParameter('doctrine.orm.proxy_dir')) {
+                if ($container->hasParameter('doctrine.orm.proxy_dir')) {
                     // Workaround for `RuntimeException: Unable to create the Doctrine Proxy directory "". in vendor/symfony/doctrine-bridge/CacheWarmer/ProxyCacheWarmer.php:49`
                     // when running PHP 8.4 and Doctrine ORM 3.5+.
                     $container->getDefinition('doctrine.orm.default_configuration')
@@ -102,6 +103,10 @@ final class Kernel extends BaseKernel
             'secrets' => false,
             'session' => ['storage_factory_id' => 'session.storage.factory.mock_file'],
             'form' => ['enabled' => $this->enableForms],
+            'translator' => [
+                'default_path' => '%kernel.project_dir%/tests/Fixtures/translations',
+                'fallbacks' => ['en'],
+            ],
         ]);
 
         $c->extension('twig', [
@@ -113,6 +118,7 @@ final class Kernel extends BaseKernel
         $doctrineConfig = [
             'dbal' => ['url' => '%env(resolve:DATABASE_URL)%'],
             'orm' => [
+                'validate_xml_mapping' => true,
                 'auto_mapping' => true,
                 'mappings' => [
                     'Test' => [
@@ -130,8 +136,10 @@ final class Kernel extends BaseKernel
             if (version_compare($doctrineBundleVersion, '3.0.0', '<')) {
                 $doctrineConfig['orm']['auto_generate_proxy_classes'] = true;
 
-                if (version_compare($doctrineBundleVersion, '2.8.0', '>=')) {
-                    $doctrineConfig['orm']['enable_lazy_ghost_objects'] = true;
+                // https://github.com/doctrine/DoctrineBundle/pull/1661
+                // https://github.com/doctrine/DoctrineBundle/pull/1962
+                if (version_compare($doctrineBundleVersion, '2.9.0', '>=')) {
+                    $doctrineConfig['orm']['report_fields_where_declared'] = true;
                 }
 
                 if (version_compare($doctrineBundleVersion, '2.12.0', '>=')) {
@@ -139,7 +147,7 @@ final class Kernel extends BaseKernel
                 }
             }
 
-            if (\PHP_VERSION_ID >= 80400 && version_compare($doctrineBundleVersion, '2.15.0', '>=') && version_compare($doctrineBundleVersion, '4.0.0', '<')) {
+            if (version_compare($doctrineBundleVersion, '2.15.0', '>=') && version_compare($doctrineBundleVersion, '4.0.0', '<')) {
                 $doctrineConfig['orm']['enable_native_lazy_objects'] = true;
             }
         }
@@ -191,6 +199,13 @@ final class Kernel extends BaseKernel
                 'alias' => 'custom_group_by_product',
             ]);
 
+        $services->set(CustomGroupByTranslatedProductAutocompleter::class)
+            ->public()
+            ->arg(1, new Reference('ux.autocomplete.entity_search_util'))
+            ->tag(AutocompleteFormTypePass::ENTITY_AUTOCOMPLETER_TAG, [
+                'alias' => 'custom_group_by_translated_product',
+            ]);
+
         $services->set(CustomAttributesProductAutocompleter::class)
             ->public()
             ->arg(1, new Reference('ux.autocomplete.entity_search_util'))
@@ -213,6 +228,11 @@ final class Kernel extends BaseKernel
             ->tag('ux.entity_autocomplete_field')
             ->public()
         ;
+
+        $services->set(InMemoryColorAutocompleter::class)
+            ->tag(AutocompleteFormTypePass::AUTOCOMPLETER_TAG, [
+                'alias' => 'in_memory_colors',
+            ]);
     }
 
     protected function configureRoutes(RoutingConfigurator $routes): void

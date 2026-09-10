@@ -6,6 +6,7 @@
         "**/package.json",
         "**/node_modules",
         "**/browsers",
+        ".agents/skills",
         ".github/PULL_REQUEST_TEMPLATE.md",
         "apps/**/config/**/*.yaml",
         "apps/**/assets/**/build",
@@ -13,6 +14,7 @@
         "src/**/dist",
         "src/**/var",
         "src/**/tests/**/fixtures/**",
+        "src/**/tests/**/Fixtures/**",
         "src/**/tests/**/__snapshots__/**"
     ],
     "printWidth": 120,

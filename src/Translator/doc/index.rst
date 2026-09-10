@@ -1,8 +1,9 @@
 Symfony UX Translator
 =====================
 
-**EXPERIMENTAL** This component is currently experimental and is likely
-to change, or even change drastically.
+.. tip::
+
+    Try the `Symfony UX Translator demo`_ and see the translations update live.
 
 Symfony UX Translator is a Symfony bundle providing the same mechanism as `Symfony Translator`_
 in JavaScript with a TypeScript integration, in Symfony applications. It is part of `the Symfony UX initiative`_.
@@ -112,6 +113,16 @@ You can also filter dumped translations by translation key patterns using wildca
 
 The wildcard ``*`` matches any characters. You can prefix a pattern with ``!`` to exclude keys matching that pattern.
 
+Manually warming the translations cache
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Translations are automatically dumped when warming up the Symfony cache. If you only need to refresh
+the JavaScript translations without warming up the whole cache, run:
+
+.. code-block:: terminal
+
+    $ php bin/console ux:translator:warm-cache
+
 Disabling TypeScript types dump
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -217,6 +228,7 @@ This bundle aims at following the same Backward Compatibility promise as
 the Symfony framework:
 https://symfony.com/doc/current/contributing/code/bc.html
 
+.. _`Symfony UX Translator demo`: https://ux.symfony.com/translator
 .. _`Symfony Translator`: https://symfony.com/doc/current/translation.html
 .. _`the Symfony UX initiative`: https://ux.symfony.com/
 .. _StimulusBundle configured in your app: https://symfony.com/bundles/StimulusBundle/current/index.html

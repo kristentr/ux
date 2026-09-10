@@ -87,17 +87,51 @@ var Backend_default = class {
 };
 var BackendResponse_default = class {
 	constructor(response) {
+		this.download = null;
+		this.parsePromise = null;
 		this.response = response;
 	}
 	async getBody() {
-		if (!this.body) this.body = await this.response.text();
+		if (!this.parsePromise) this.parsePromise = this.parse();
+		await this.parsePromise;
 		return this.body;
+	}
+	getDownload() {
+		return this.download;
 	}
 	getLiveUrl() {
 		if (void 0 === this.liveUrl) this.liveUrl = this.response.headers.get("X-Live-Url");
 		return this.liveUrl;
 	}
+	getDownloadUrl() {
+		return this.response.headers.get("X-Live-Download-Url");
+	}
+	isRemoved() {
+		return this.response.headers.has("X-Live-Remove");
+	}
+	async parse() {
+		const htmlLength = this.response.headers.get("X-Live-Html-Length");
+		if (null === htmlLength) {
+			this.body = await this.response.text();
+			return;
+		}
+		const buffer = await this.response.arrayBuffer();
+		const splitAt = Number.parseInt(htmlLength, 10);
+		this.body = new TextDecoder().decode(buffer.slice(0, splitAt));
+		this.download = {
+			filename: decodeFilename(this.response.headers.get("X-Live-Download-Filename")),
+			blob: new Blob([buffer.slice(splitAt)], { type: this.response.headers.get("X-Live-Download-Type") ?? "application/octet-stream" })
+		};
+	}
 };
+function decodeFilename(value) {
+	if (!value) return "download";
+	try {
+		return decodeURIComponent(value) || "download";
+	} catch {
+		return "download";
+	}
+}
 function getElementAsTagText(element) {
 	return element.innerHTML ? element.outerHTML.slice(0, element.outerHTML.indexOf(element.innerHTML)) : element.outerHTML;
 }
@@ -262,6 +296,7 @@ function trimAll(str) {
 	return str.replace(/[\s]+/g, " ").trim();
 }
 function normalizeModelName(model) {
+	if (!model.includes("[") && !model.includes("]")) return model;
 	return model.replace(/\[]$/, "").split("[").map((s) => s.replace("]", "")).join(".");
 }
 function getValueFromElement(element, valueStore) {
@@ -623,12 +658,9 @@ var Idiomorph = (function() {
 			} else if (ctx.head.shouldRemove(currentHeadElt) !== false) removed.push(currentHeadElt);
 		}
 		nodesToAppend.push(...srcToNewHeadNodes.values());
-		log("to append: ", nodesToAppend);
 		let promises = [];
 		for (const newNode of nodesToAppend) {
-			log("adding: ", newNode);
 			let newElt = document.createRange().createContextualFragment(newNode.outerHTML).firstChild;
-			log(newElt);
 			if (ctx.callbacks.beforeNodeAdded(newElt) !== false) {
 				if (newElt.href || newElt.src) {
 					let resolve = null;
@@ -656,7 +688,6 @@ var Idiomorph = (function() {
 		});
 		return promises;
 	}
-	function log() {}
 	function noOp() {}
 	function mergeDefaults(config) {
 		let finalConfig = {};
@@ -1383,6 +1414,7 @@ var Component = class {
 		this.pendingActions = [];
 		this.pendingFiles = {};
 		this.isRequestPending = false;
+		this.isRemoved = false;
 		this.requestDebounceTimeout = null;
 		this.element = element;
 		this.name = name;
@@ -1481,7 +1513,21 @@ var Component = class {
 	isTurboEnabled() {
 		return typeof Turbo !== "undefined" && !this.element.closest("[data-turbo=\"false\"]");
 	}
+	removeFromPage() {
+		this.isRemoved = true;
+		this.disconnect();
+		const element = this.element;
+		for (const name of element.getAttributeNames()) if (name.startsWith("data-live-") && name.endsWith("-value")) element.removeAttribute(name);
+		element.setAttribute("data-live-removing", "");
+		requestAnimationFrame(() => {
+			const animations = (element.getAnimations?.({ subtree: true }) ?? []).filter((animation) => animation.effect?.getComputedTiming().endTime !== Number.POSITIVE_INFINITY);
+			Promise.allSettled(animations.map((animation) => animation.finished)).then(() => {
+				element.remove();
+			});
+		});
+	}
 	tryStartingRequest() {
+		if (this.isRemoved) return;
 		if (!this.backendRequest) {
 			this.performRequest();
 			return;
@@ -1494,9 +1540,11 @@ var Component = class {
 		this.unsyncedInputsTracker.resetUnsyncedFields();
 		const filesToSend = {};
 		for (const [key, value] of Object.entries(this.pendingFiles)) if (value.files) filesToSend[key] = value.files;
+		const actionsToSend = this.pendingActions.slice(0, 50);
+		const remainingActions = this.pendingActions.slice(50);
 		const requestConfig = {
 			props: this.valueStore.getOriginalProps(),
-			actions: this.pendingActions,
+			actions: actionsToSend,
 			updated: this.valueStore.getDirtyProps(),
 			children: {},
 			updatedPropsFromParent: this.valueStore.getUpdatedPropsFromParent(),
@@ -1505,21 +1553,29 @@ var Component = class {
 		this.hooks.triggerHook("request:started", requestConfig);
 		this.backendRequest = this.backend.makeRequest(requestConfig.props, requestConfig.actions, requestConfig.updated, requestConfig.children, requestConfig.updatedPropsFromParent, requestConfig.files);
 		this.hooks.triggerHook("loading.state:started", this.element, this.backendRequest);
-		this.pendingActions = [];
+		this.pendingActions = remainingActions;
 		this.valueStore.flushDirtyPropsToPending();
-		this.isRequestPending = false;
+		this.isRequestPending = remainingActions.length > 0;
 		this.backendRequest.promise.then(async (response) => {
 			const backendResponse = new BackendResponse_default(response);
-			const html = await backendResponse.getBody();
-			for (const input of Object.values(this.pendingFiles)) input.value = "";
 			const headers = backendResponse.response.headers;
-			if (!headers.get("Content-Type")?.includes("application/vnd.live-component+html") && !headers.get("X-Live-Redirect")) {
+			for (const input of Object.values(this.pendingFiles)) input.value = "";
+			const html = await backendResponse.getBody();
+			if (!headers.get("Content-Type")?.includes("application/vnd.live-component+html") && !headers.get("X-Live-Redirect") && !headers.has("X-Live-Remove")) {
 				const controls = { displayError: true };
 				this.valueStore.pushPendingPropsBackToDirty();
 				this.hooks.triggerHook("response:error", backendResponse, controls);
 				if (controls.displayError) this.renderError(html);
 				this.backendRequest = null;
 				thisPromiseResolve(backendResponse);
+				return response;
+			}
+			if (backendResponse.isRemoved()) {
+				this.isRemoved = true;
+				this.processRerender(html, backendResponse);
+				this.backendRequest = null;
+				thisPromiseResolve(backendResponse);
+				this.removeFromPage();
 				return response;
 			}
 			const liveUrl = backendResponse.getLiveUrl();
@@ -1584,6 +1640,14 @@ var Component = class {
 				bubbles: true
 			}));
 		});
+		try {
+			const downloadUrl = backendResponse.getDownloadUrl();
+			const download = backendResponse.getDownload();
+			if (downloadUrl) triggerDownload({ url: downloadUrl });
+			else if (download) triggerDownload(download);
+		} catch (error) {
+			console.error("Could not start the download:", error);
+		}
 		this.hooks.triggerHook("render:finished", this);
 	}
 	calculateDebounce(debounce) {
@@ -1664,6 +1728,7 @@ function proxifyComponent(component) {
 				return Reflect.get(component, prop);
 			}
 			if (component.valueStore.has(prop)) return component.getData(prop);
+			if ("toJSON" === prop || "then" === prop) return;
 			return (args) => {
 				return component.action.apply(component, [prop, args]);
 			};
@@ -1677,6 +1742,21 @@ function proxifyComponent(component) {
 			return true;
 		}
 	});
+}
+function triggerDownload(download) {
+	const fromUrl = "url" in download;
+	const href = fromUrl ? download.url : URL.createObjectURL(download.blob);
+	const link = Object.assign(document.createElement("a"), {
+		href,
+		download: fromUrl ? "" : download.filename,
+		style: "display: none"
+	});
+	document.body.appendChild(link);
+	link.click();
+	setTimeout(() => {
+		document.body.removeChild(link);
+		if (!fromUrl) URL.revokeObjectURL(href);
+	}, 75);
 }
 var StimulusElementDriver = class {
 	constructor(controller) {
@@ -1750,7 +1830,8 @@ var ChildComponentPlugin_default = class {
 	constructor(component) {
 		this.parentModelBindings = [];
 		this.component = component;
-		this.parentModelBindings = getAllModelDirectiveFromElements(this.component.element).map(get_model_binding_default);
+		const modelDirectives = getAllModelDirectiveFromElements(this.component.element);
+		this.parentModelBindings = modelDirectives.map(get_model_binding_default);
 	}
 	attachToComponent(component) {
 		component.on("request:started", (requestData) => {
@@ -1825,8 +1906,8 @@ var LoadingPlugin_default = class {
 		this.handleLoadingToggle(component, false, targetElement, null);
 	}
 	handleLoadingToggle(component, isLoading, targetElement, backendRequest) {
-		if (isLoading) this.addAttributes(targetElement, ["busy"]);
-		else this.removeAttributes(targetElement, ["busy"]);
+		if (isLoading) targetElement.setAttribute("aria-busy", "true");
+		else targetElement.removeAttribute("aria-busy");
 		this.getLoadingDirectives(component, targetElement).forEach(({ element, directives }) => {
 			if (isLoading) this.addAttributes(element, ["data-live-is-loading"]);
 			else this.removeAttributes(element, ["data-live-is-loading"]);
@@ -1896,6 +1977,7 @@ var LoadingPlugin_default = class {
 		const loadingDirectives = [];
 		let matchingElements = Array.from(element.querySelectorAll("[data-loading]"));
 		matchingElements = matchingElements.filter((elt) => elementBelongsToThisComponent(elt, component));
+		matchingElements = matchingElements.filter((elt) => !elt.closest("[data-live-ignore]"));
 		if (element.hasAttribute("data-loading")) matchingElements = [element, ...matchingElements];
 		matchingElements.forEach((element) => {
 			if (!(element instanceof HTMLElement) && !(element instanceof SVGElement)) throw new Error("Invalid Element Type");
@@ -2262,14 +2344,17 @@ var LiveControllerDefault = class LiveControllerDefault extends Controller {
 		if (false === modelBinding.debounce) if (modelBinding.targetEventName === "input") modelBinding.debounce = true;
 		else modelBinding.debounce = 0;
 		const finalValue = getValueFromElement(element, this.component.valueStore);
+		const finalValueIsEmpty = finalValue === "" || finalValue === null || finalValue === void 0;
 		if (isTextualInputElement(element) || isTextareaElement(element)) {
-			if (modelBinding.minLength !== null && typeof finalValue === "string" && finalValue.length < modelBinding.minLength) return;
-			if (modelBinding.maxLength !== null && typeof finalValue === "string" && finalValue.length > modelBinding.maxLength) return;
+			if (!finalValueIsEmpty && modelBinding.minLength !== null && typeof finalValue === "string" && finalValue.length < modelBinding.minLength) return;
+			if (!finalValueIsEmpty && modelBinding.maxLength !== null && typeof finalValue === "string" && finalValue.length > modelBinding.maxLength) return;
 		}
 		if (isNumericalInputElement(element)) {
-			const numericValue = Number(finalValue);
-			if (modelBinding.minValue !== null && numericValue < modelBinding.minValue) return;
-			if (modelBinding.maxValue !== null && numericValue > modelBinding.maxValue) return;
+			if (!finalValueIsEmpty) {
+				const numericValue = Number(finalValue);
+				if (modelBinding.minValue !== null && numericValue < modelBinding.minValue) return;
+				if (modelBinding.maxValue !== null && numericValue > modelBinding.maxValue) return;
+			}
 		}
 		this.component.set(modelBinding.modelName, finalValue, modelBinding.shouldRender, modelBinding.debounce);
 	}

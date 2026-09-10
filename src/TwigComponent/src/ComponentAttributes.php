@@ -12,7 +12,9 @@
 namespace Symfony\UX\TwigComponent;
 
 use Symfony\UX\StimulusBundle\Dto\StimulusAttributes;
-use Symfony\WebpackEncoreBundle\Dto\AbstractStimulusDto;
+use Symfony\UX\TwigComponent\Exception\RuntimeException;
+use Twig\Extra\Html\HtmlAttr\AttributeValueInterface;
+use Twig\Extra\Html\HtmlAttr\MergeableInterface;
 use Twig\Runtime\EscaperRuntime;
 
 /**
@@ -47,6 +49,10 @@ final class ComponentAttributes implements \Stringable, \IteratorAggregate, \Cou
                 continue;
             }
 
+            if (null === $value) {
+                throw new RuntimeException(\sprintf('Attribute "%s" value cannot be null. If you want to remove an attribute, use the "remove()" method.', $key));
+            }
+
             if (false === $value) {
                 continue;
             }
@@ -60,9 +66,11 @@ final class ComponentAttributes implements \Stringable, \IteratorAggregate, \Cou
                 continue;
             }
 
-            if (null === $value) {
-                trigger_deprecation('symfony/ux-twig-component', '2.8.0', 'Passing "null" as an attribute value is deprecated and will throw an exception in 3.0.');
-                $value = true;
+            if ($value instanceof AttributeValueInterface) {
+                $value = $value->getValue();
+                if (null === $value) {
+                    continue;
+                }
             }
 
             if (!\is_scalar($value) && !($value instanceof \Stringable)) {
@@ -109,6 +117,10 @@ final class ComponentAttributes implements \Stringable, \IteratorAggregate, \Cou
             return null;
         }
 
+        if ($value instanceof AttributeValueInterface && null === $value = $value->getValue()) {
+            return null;
+        }
+
         if ($value instanceof \Stringable) {
             $value = (string) $value;
         }
@@ -138,8 +150,11 @@ final class ComponentAttributes implements \Stringable, \IteratorAggregate, \Cou
      * Set default attributes. These are used if they are not already
      * defined.
      *
-     * "class" and "data-controller" are special, these defaults are prepended to
-     * the existing attribute (if available).
+     * "class", "data-controller" and "data-action" are special, these defaults are
+     * prepended to the existing attribute (if available).
+     *
+     * Values implementing Twig HTML extra's MergeableInterface (e.g. from the
+     * "tailwind_classes" filter) are merged through the merge protocol, for any key.
      */
     public function defaults(iterable $attributes): self
     {
@@ -152,13 +167,23 @@ final class ComponentAttributes implements \Stringable, \IteratorAggregate, \Cou
         }
 
         foreach ($this->attributes as $key => $value) {
-            if (\in_array($key, ['class', 'data-controller', 'data-action'], true) && isset($attributes[$key])) {
-                $attributes[$key] = "{$attributes[$key]} {$value}";
+            if (!isset($attributes[$key])) {
+                $attributes[$key] = $value;
 
                 continue;
             }
 
-            $attributes[$key] = $value;
+            $default = $attributes[$key];
+
+            if ($value instanceof MergeableInterface) {
+                $attributes[$key] = $value->mergeInto($default);
+            } elseif ($default instanceof MergeableInterface) {
+                $attributes[$key] = $default->appendFrom($value);
+            } elseif (\in_array($key, ['class', 'data-controller', 'data-action'], true)) {
+                $attributes[$key] = "{$default} {$value}";
+            } else {
+                $attributes[$key] = $value;
+            }
         }
 
         foreach (array_keys($this->rendered) as $attribute) {
@@ -196,33 +221,6 @@ final class ComponentAttributes implements \Stringable, \IteratorAggregate, \Cou
         }
 
         return $clone;
-    }
-
-    public function add($stimulusDto): self
-    {
-        if ($stimulusDto instanceof AbstractStimulusDto) {
-            trigger_deprecation('symfony/ux-twig-component', '2.9.0', 'Passing a StimulusDto to ComponentAttributes::add() is deprecated. Run "composer require symfony/stimulus-bundle" then use "attributes.defaults(stimulus_controller(\'...\'))".');
-        } elseif ($stimulusDto instanceof StimulusAttributes) {
-            trigger_deprecation('symfony/ux-twig-component', '2.9.0', 'Calling ComponentAttributes::add() is deprecated. Instead use "attributes.defaults(stimulus_controller(\'...\'))".');
-
-            return $this->defaults($stimulusDto);
-        } else {
-            throw new \InvalidArgumentException(\sprintf('Argument 1 passed to "%s()" must be an instance of "%s" or "%s", "%s" given.', __METHOD__, AbstractStimulusDto::class, StimulusAttributes::class, get_debug_type($stimulusDto)));
-        }
-
-        $controllersAttributes = $stimulusDto->toArray();
-        $attributes = $this->attributes;
-
-        $attributes['data-controller'] = trim(implode(' ', array_merge(
-            explode(' ', $attributes['data-controller'] ?? ''),
-            explode(' ', $controllersAttributes['data-controller'] ?? [])
-        )));
-        unset($controllersAttributes['data-controller']);
-
-        $clone = new self($attributes, $this->escaper);
-
-        // add the remaining attributes for values/classes
-        return $clone->defaults($controllersAttributes);
     }
 
     public function remove($key): self

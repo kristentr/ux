@@ -12,18 +12,28 @@
 namespace Symfony\UX\Toolkit\Kit;
 
 use Symfony\UX\Toolkit\Assert;
+use Symfony\UX\Toolkit\Dependency\DependencyInterface;
+use Symfony\UX\Toolkit\Dependency\DependencyParser;
 
 /**
  * @author Hugo Alliaume <hugo@alliau.me>
  */
 final class KitManifest
 {
+    /**
+     * @param list<DependencyInterface> $dependencies Kit-global dependencies, available to every recipe
+     * @param ?string                   $color        Accent color of the kit, used when rendering its documentation
+     * @param ?string                   $icon         Path, relative to the kit root, to an SVG icon of the kit
+     */
     public function __construct(
         public readonly string $name,
         public readonly string $description,
         public readonly string $license,
         public readonly string $homepage,
         public ?string $installAsMarkdown = null,
+        public readonly array $dependencies = [],
+        public readonly ?string $color = null,
+        public readonly ?string $icon = null,
     ) {
         Assert::kitName($this->name);
 
@@ -44,7 +54,10 @@ final class KitManifest
             name: $data['name'] ?? throw new \InvalidArgumentException('Property "name" is required.'),
             description: $data['description'] ?? throw new \InvalidArgumentException('Property "description" is required.'),
             license: $data['license'] ?? throw new \InvalidArgumentException('Property "license" is required.'),
-            homepage: $data['homepage'] ?? throw new \InvalidArgumentException('Property "homepage" is required.')
+            homepage: $data['homepage'] ?? throw new \InvalidArgumentException('Property "homepage" is required.'),
+            dependencies: DependencyParser::parse($data['dependencies'] ?? null, allowRecipe: false),
+            color: $data['color'] ?? null,
+            icon: $data['icon'] ?? null,
         );
     }
 }

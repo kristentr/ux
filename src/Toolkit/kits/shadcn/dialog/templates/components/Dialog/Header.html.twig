@@ -1,7 +1,9 @@
-{# @block content The header area, typically contains `Dialog:Title` and `Dialog:Description` #}
+{# @block content The header area, typically contains `Dialog:Title` and `Dialog:Description`. #}
 <header
-    class="{{ ('flex flex-col gap-2 text-center sm:text-left ' ~ attributes.render('class'))|tailwind_merge }}"
-    {{ attributes }}
+    data-slot="dialog-header"
+    {{ attributes.defaults({
+        class: 'flex flex-col gap-2'|tailwind_classes,
+    }) }}
 >
     {%- block content %}{% endblock -%}
 </header>
