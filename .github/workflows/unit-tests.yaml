@@ -6,19 +6,29 @@ defaults:
 
 on:
     push:
+        branches-ignore:
+            - 'dependabot/**'
         paths-ignore:
+            - '.github/workflows/app-tests.yaml'
+            - '.github/workflows/demo-native.yaml'
+            - 'apps/demo-native/**'
+            - 'apps/e2e/**'
             - 'src/*/doc/**'
             - 'src/**/*.md'
-            - '.github/workflows/app-tests.yaml'
     pull_request:
         paths-ignore:
+            - '.github/workflows/app-tests.yaml'
+            - '.github/workflows/demo-native.yaml'
+            - 'apps/demo-native/**'
+            - 'apps/e2e/**'
             - 'src/*/doc/**'
             - 'src/**/*.md'
-            - '.github/workflows/app-tests.yaml'
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
     cancel-in-progress: true
+
+permissions: {}
 
 jobs:
     php:
@@ -26,7 +36,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                php-version: ['8.1', '8.2', '8.3', '8.4', '8.5']
+                php-version: ['8.4', '8.5']
                 dependency-version: ['']
                 symfony-version: ['']
                 minimum-stability: ['stable']
@@ -36,57 +46,57 @@ jobs:
                       php-version: '8.5'
 
                     # lowest deps
-                    - php-version: '8.1'
+                    - php-version: '8.4'
                       dependency-version: 'lowest'
 
-                    # LTS version of Symfony
-                    - php-version: '8.1'
-                      symfony-version: '6.4.*'
-                    - php-version: '8.1'
-                      symfony-version: '6.4.*'
-                      os: 'windows-latest'
-
-                    - php-version: '8.2'
+                    # 7.4 LTS
+                    - php-version: '8.4'
                       symfony-version: '7.4.*'
-                    - php-version: '8.2'
+                    - php-version: '8.4'
                       symfony-version: '7.4.*'
                       os: 'windows-latest'
 
                     # Explicit Symfony versions
                     - php-version: '8.4'
-                      symfony-version: '8.0.*'
+                      symfony-version: '8.1.*'
                     - php-version: '8.5'
-                      symfony-version: '8.0.*'
+                      symfony-version: '8.1.*'
+
+                    - php-version: '8.5'
+                      symfony-version: '8.1.*'
+                      os: 'windows-latest'
 
         env:
-            SYMFONY_REQUIRE: ${{ matrix.symfony-version || '>=5.4' }} # TODO: To change to '>=6.4' in 3.x
+            SYMFONY_REQUIRE: ${{ matrix.symfony-version || '>=7.4' }}
             # https://github.com/spatie/phpunit-snapshot-assertions#usage-in-ci
             CREATE_SNAPSHOTS: false
         steps:
-            - uses: actions/checkout@v4
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
 
             - name: Configure environment
               run: |
                   echo COLUMNS=120 >> $GITHUB_ENV
                   echo COMPOSER_MIN_STAB='composer config minimum-stability ${{ matrix.minimum-stability || 'stable' }} --ansi' >> $GITHUB_ENV
                   echo COMPOSER_UP='composer update ${{ matrix.dependency-version == 'lowest' && '--prefer-lowest' || '' }} --no-progress --no-interaction --ansi' >> $GITHUB_ENV
-                  echo PHPUNIT='vendor/bin/simple-phpunit ${{ matrix.dependency-version == 'lowest' && '--exclude-group skip-on-lowest' || '' }} ${{ matrix.os == 'windows-latest' && '--exclude-group transient-on-windows' || '' }}' >> $GITHUB_ENV
+                  echo PHPUNIT='vendor/bin/phpunit ${{ matrix.dependency-version == 'lowest' && '--exclude-group skip-on-lowest' || '' }} ${{ matrix.os == 'windows-latest' && '--exclude-group transient-on-windows' || '' }}' >> $GITHUB_ENV
                   [ 'lowest' = '${{ matrix.dependency-version }}' ] && export SYMFONY_DEPRECATIONS_HELPER=weak
 
-                  # Swup and Typed have no tests, Turbo has its own workflow file
-                  EXCLUDED_PACKAGES="Typed|Swup|Turbo"
+                  # Exclude packages that don't have unit tests yet
+                  EXCLUDED_PACKAGES="^$"
 
                   # Exclude deprecated packages when testing against lowest dependencies
-                  if [ "${{ matrix.dependency-version }}" = "lowest" ]; then
-                    EXCLUDED_PACKAGES="$EXCLUDED_PACKAGES|LazyImage|TogglePassword"
-                  fi
+                  #if [ "${{ matrix.dependency-version }}" = "lowest" ]; then
+                  #  EXCLUDED_PACKAGES="$EXCLUDED_PACKAGES"
+                  #fi
 
                   PACKAGES=$(find src/ -mindepth 2 -type f -name composer.json -not -path "*/vendor/*" -printf '%h\n' | sed 's/^src\///' | grep -Ev "$EXCLUDED_PACKAGES" | sort |  tr '\n' ' ')
                   echo "Packages: $PACKAGES"
                   echo "PACKAGES=$PACKAGES" >> $GITHUB_ENV
 
             - name: Setup PHP
-              uses: shivammathur/setup-php@v2
+              uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
               with:
                   php-version: ${{ matrix.php-version }}
                   extensions: ${{ matrix.os == 'windows-latest' && 'pdo_sqlite,sqlite3,fileinfo,gd,zip' || '' }}
@@ -98,7 +108,7 @@ jobs:
                   echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
 
             - name: Cache packages dependencies
-              uses: actions/cache@v4
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
               with:
                   path: ${{ steps.composer-cache.outputs.dir }}
                   key: ${{ runner.os }}-composer-packages-${{ matrix.php-version }}-${{ matrix.dependency-version }}-${{ matrix.symfony-version }}-${{ matrix.minimum-stability }}-${{ hashFiles('src/**/composer.json') }}
@@ -106,64 +116,26 @@ jobs:
                       ${{ runner.os }}-composer-packages-${{ matrix.php-version }}-${{ matrix.dependency-version }}-${{ matrix.symfony-version }}-${{ matrix.minimum-stability }}
 
             - name: Install root dependencies
-              uses: ramsey/composer-install@v3
+              uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
               with:
                   working-directory: ${{ github.workspace }}
 
             - name: Build root packages
               run: php .github/build-packages.php
 
-            - name: Run packages tests (Unix)
-              if: matrix.os != 'windows-latest'
+            - name: Run packages tests
               run: |
                   source .github/workflows/.utils.sh
-                  echo "$PACKAGES" | xargs -n1 | parallel -j +3 "_run_task {} \
-                    '(cd src/{} \
-                    && $COMPOSER_MIN_STAB \
-                    && before_composer_install \"{}\" \"${{ matrix.php-version }}\" \"${{ matrix.symfony-version }}\" \
-                    && $COMPOSER_UP \
-                    && after_composer_install \"{}\" \"${{ matrix.php-version }}\" \"${{ matrix.symfony-version }}\" \
-                    && $PHPUNIT)'"
-
-            - name: Run packages tests (Windows)
-              if: matrix.os == 'windows-latest'
-              run: |
-                  source .github/workflows/.utils.sh
-
-                  # parallel is not available on Windows, so we need to run the tests sequentially
-                  FAILED_PACKAGES=""
-                  for PACKAGE in $PACKAGES; do
-                    if ! PACKAGE="$PACKAGE" _run_task_sequential $PACKAGE \
-                      '(cd src/$PACKAGE \
-                      && $COMPOSER_MIN_STAB \
-                      && before_composer_install $PACKAGE ${{ matrix.php-version }} ${{ matrix.symfony-version }} \
-                      && $COMPOSER_UP \
-                      && after_composer_install $PACKAGE ${{ matrix.php-version }} ${{ matrix.symfony-version }} \
-                      && $PHPUNIT)'; then
-                      FAILED_PACKAGES="$FAILED_PACKAGES $PACKAGE"
-                    fi
-                  done
-
-                  if [ -n "$FAILED_PACKAGES" ]; then
-                    echo "The following packages failed:$FAILED_PACKAGES"
-                    exit 1
-                  fi
+                  _run_package_tests
     js:
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@v4
-
-            - run: npm i -g corepack && corepack enable
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
-                  node-version-file: '.nvmrc'
-                  cache: 'pnpm'
-                  cache-dependency-path: |
-                      pnpm-lock.yaml
-                      package.json
-                      src/**/package.json
+                  persist-credentials: false
 
-            - name: Install root JS dependencies
-              run: pnpm install --frozen-lockfile
+            - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+              with:
+                  cache: true
 
             - run: pnpm run test:unit

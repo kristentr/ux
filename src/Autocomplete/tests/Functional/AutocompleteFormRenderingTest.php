@@ -25,7 +25,7 @@ class AutocompleteFormRenderingTest extends KernelTestCase
     use HasBrowser;
     use ResetDatabase;
 
-    public function testFieldsRenderWithStimulusController()
+    public function testFieldsRenderWithStimulusController(): void
     {
         $this->browser()
             ->throwExceptions()
@@ -38,10 +38,13 @@ class AutocompleteFormRenderingTest extends KernelTestCase
             ->assertElementAttributeContains('#product_portionSize', 'data-controller', 'symfony--ux-autocomplete--autocomplete')
             ->assertElementAttributeContains('#product_tags', 'data-controller', 'symfony--ux-autocomplete--autocomplete')
             ->assertElementAttributeContains('#product_tags', 'data-symfony--ux-autocomplete--autocomplete-tom-select-options-value', 'createOnBlur')
+
+            ->assertElementAttributeContains('#product_portionSizeResetOnFocus', 'data-controller', 'symfony--ux-autocomplete--autocomplete')
+            ->assertElementAttributeContains('#product_portionSizeResetOnFocus', 'data-symfony--ux-autocomplete--autocomplete-reset-on-focus-value', '')
         ;
     }
 
-    public function testCategoryFieldSubmitsCorrectly()
+    public function testCategoryFieldSubmitsCorrectly(): void
     {
         $firstCat = CategoryFactory::createOne(['name' => 'First cat']);
         CategoryFactory::createOne(['name' => 'in space']);
@@ -75,7 +78,7 @@ class AutocompleteFormRenderingTest extends KernelTestCase
         ;
     }
 
-    public function testProperlyLoadsChoicesWithIdValueObjects()
+    public function testProperlyLoadsChoicesWithIdValueObjects(): void
     {
         $ingredient1 = IngredientFactory::createOne(['name' => 'Flour']);
         $ingredient2 = IngredientFactory::createOne(['name' => 'Sugar']);
@@ -103,7 +106,7 @@ class AutocompleteFormRenderingTest extends KernelTestCase
         ;
     }
 
-    public function testMultipleDoesNotFailWithoutSelectedChoices()
+    public function testMultipleDoesNotFailWithoutSelectedChoices(): void
     {
         $this->browser()
             ->throwExceptions()
@@ -124,7 +127,7 @@ class AutocompleteFormRenderingTest extends KernelTestCase
         ;
     }
 
-    public function testItUsesPassedExtraOptions()
+    public function testItUsesPassedExtraOptions(): void
     {
         $ingredient1 = IngredientFactory::createOne(['name' => 'Flour']);
         $ingredient2 = IngredientFactory::createOne(['name' => 'Sugar']);
@@ -157,7 +160,7 @@ class AutocompleteFormRenderingTest extends KernelTestCase
         ;
     }
 
-    public function testItReturnsErrorWhenSendingMalformedExtraOptions()
+    public function testItReturnsErrorWhenSendingMalformedExtraOptions(): void
     {
         $extraOptionsWithoutChecksum = $this->encodeData(['foo' => 'bar']);
         $extraOptionsWithInvalidChecksum = $this->encodeData(['foo' => 'bar', '@checksum' => 'invalid']);

@@ -11,20 +11,20 @@
 
 namespace Symfony\UX\Turbo\Tests\Helper;
 
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\TestWith;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Turbo\Helper\TurboStream;
 
 class TurboStreamTest extends TestCase
 {
-    /**
-     * @testWith ["append"]
-     *           ["prepend"]
-     *           ["replace"]
-     *           ["update"]
-     *           ["before"]
-     *           ["after"]
-     */
-    public function testStream(string $action)
+    #[TestWith(['append'])]
+    #[TestWith(['prepend'])]
+    #[TestWith(['replace'])]
+    #[TestWith(['update'])]
+    #[TestWith(['before'])]
+    #[TestWith(['after'])]
+    public function testStream(string $action): void
     {
         $this->assertSame(<<<EOHTML
             <turbo-stream action="{$action}" targets="some[&quot;selector&quot;]">
@@ -35,11 +35,9 @@ class TurboStreamTest extends TestCase
         );
     }
 
-    /**
-     * @testWith ["replace"]
-     *           ["update"]
-     */
-    public function testStreamMorph(string $action)
+    #[TestWith(['replace'])]
+    #[TestWith(['update'])]
+    public function testStreamMorph(string $action): void
     {
         $this->assertSame(<<<EOHTML
             <turbo-stream action="{$action}" targets="some[&quot;selector&quot;]" method="morph">
@@ -50,7 +48,7 @@ class TurboStreamTest extends TestCase
         );
     }
 
-    public function testRemove()
+    public function testRemove(): void
     {
         $this->assertSame(<<<EOHTML
             <turbo-stream action="remove" targets="some[&quot;selector&quot;]"></turbo-stream>
@@ -59,7 +57,7 @@ class TurboStreamTest extends TestCase
         );
     }
 
-    public function testRefreshWithoutId()
+    public function testRefreshWithoutId(): void
     {
         $this->assertSame(<<<EOHTML
             <turbo-stream action="refresh"></turbo-stream>
@@ -68,7 +66,7 @@ class TurboStreamTest extends TestCase
         );
     }
 
-    public function testRefreshWithId()
+    public function testRefreshWithId(): void
     {
         $this->assertSame(<<<EOHTML
             <turbo-stream action="refresh" request-id="a&quot;b"></turbo-stream>
@@ -77,7 +75,7 @@ class TurboStreamTest extends TestCase
         );
     }
 
-    public function testCustom()
+    public function testCustom(): void
     {
         $this->assertSame(<<<EOHTML
             <turbo-stream action="customAction" targets="some[&quot;selector&quot;]" someAttr="someValue" boolAttr intAttr="0" floatAttr="3.14">
@@ -89,11 +87,10 @@ class TurboStreamTest extends TestCase
     }
 
     /**
-     * @dataProvider customThrowsExceptionDataProvider
-     *
      * @param array<string, string|int|float|null> $attr
      */
-    public function testCustomThrowsException(string $action, string $target, string $html, array $attr)
+    #[DataProvider('customThrowsExceptionDataProvider')]
+    public function testCustomThrowsException(string $action, string $target, string $html, array $attr): void
     {
         $this->expectException(\InvalidArgumentException::class);
         TurboStream::action($action, $target, $html, $attr);

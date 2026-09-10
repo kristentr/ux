@@ -1,0 +1,19 @@
+{# @prop shape 'rounded'|'pill' The badge shape. #}
+{# @block content The content rendered inside the skeleton placeholder. #}
+{%- props shape = 'pill' -%}
+{%- set style = html_cva(
+    base: 'animate-pulse bg-neutral-quaternary',
+    variants: {
+        shape: {
+            rounded: 'rounded-base',
+            pill: 'rounded-full',
+        },
+    },
+) -%}
+<div
+    {{ attributes.defaults({
+        class: style.apply({shape: shape})|tailwind_classes,
+    }) }}
+>
+    {%- block content %}{% endblock -%}
+</div>

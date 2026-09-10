@@ -2,11 +2,14 @@
     "$schema": "../../../schema-kit-recipe-v1.json",
     "type": "component",
     "name": "Separator",
-    "description": "A visual divider that creates space between content elements, available in horizontal and vertical orientations.",
     "copy-files": {
         "templates/": "templates/"
     },
     "dependencies": {
-        "composer": ["twig/extra-bundle", "twig/html-extra:^3.12.0", "tales-from-a-dev/twig-tailwind-extra:^1.0.0"]
+        "composer": [
+            "twig/html-extra:^3.24.0",
+            "symfony/ux-twig-component:^3.5",
+            "tales-from-a-dev/twig-tailwind-extra:^1.3.0"
+        ]
     }
 }

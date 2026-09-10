@@ -6,21 +6,25 @@ defaults:
 
 on:
     push:
+        branches-ignore:
+            - 'dependabot/**'
         paths-ignore:
-            - 'src/*/doc/**'
-            - 'src/**/*.md'
             - '.github/workflows/app-tests.yaml'
             - '.github/workflows/unit-tests.yaml'
+            - 'src/*/doc/**'
+            - 'src/**/*.md'
     pull_request:
         paths-ignore:
-            - 'src/*/doc/**'
-            - 'src/**/*.md'
             - '.github/workflows/app-tests.yaml'
             - '.github/workflows/unit-tests.yaml'
+            - 'src/*/doc/**'
+            - 'src/**/*.md'
 
 concurrency:
     group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
     cancel-in-progress: true
+
+permissions: {}
 
 jobs:
     test:
@@ -28,23 +32,24 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                symfony: ['6.4', '7.3']
+                symfony: ['7.4', '8.1']
+                browser: ['chrome-lowest', 'chrome-latest', 'firefox-latest']
         env:
             SYMFONY_REQUIRE: '${{ matrix.symfony }}.*'
         steps:
-            - uses: actions/checkout@v4
-
-            - run: npm i -g corepack && corepack enable
-            - uses: actions/setup-node@v4
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
-                  node-version-file: '.nvmrc'
-                  cache: 'pnpm'
-                  cache-dependency-path: |
-                      pnpm-lock.yaml
-                      package.json
+                  persist-credentials: false
 
-            - name: Install root JS dependencies
-              run: pnpm install --frozen-lockfile
+            - uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+              with:
+                  cache: true
+
+            - name: Cache custom browsers
+              uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+              with:
+                  path: ./browsers
+                  key: ${{ runner.os }}-browsers-${{ matrix.browser }}-${{ hashFiles('bin/get_browsers.mjs') }}
 
             - name: Install custom browsers
               run: node ./bin/get_browsers.mjs
@@ -52,41 +57,45 @@ jobs:
             - name: Install browsers with Playwright
               run: pnpm exec playwright install firefox ffmpeg
 
-            - uses: shivammathur/setup-php@v2
+            - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
               with:
-                  php-version: 8.2
+                  php-version: ${{ matrix.symfony >= '8.0' && '8.5' || '8.4' }}
                   tools: symfony-cli, flex
 
             - name: Install root PHP dependencies
-              uses: ramsey/composer-install@v3
+              uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
               with:
                   working-directory: ${{ github.workspace }}
 
-            - name: Build root packages
+            - name: Build root PHP packages
               run: php .github/build-packages.php
 
             - name: Start Docker containers
-              run: docker compose up -d --build
+              run: docker compose up -d --build --wait
+              working-directory: apps/e2e
+
+            - name: Show running Docker containers
+              run: |
+                  docker compose ps -a
+                  docker compose logs
               working-directory: apps/e2e
 
             - name: Configure E2E app
               run: |
                   echo 'APP_SECRET=df4c071596e64cc75a349456f2887ae2419ae650' >> .env.local
+                  echo 'APP_ENV=prod' >> .env.local
               working-directory: apps/e2e
 
             - name: Install E2E PHP dependencies
-              uses: ramsey/composer-install@v3
+              uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
               with:
                   working-directory: apps/e2e
                   dependency-versions: highest
                   custom-cache-suffix: symfony-${{ matrix.symfony }}
+                  composer-options: '--no-dev --optimize-autoloader --classmap-authoritative'
 
-            - name: Prepare E2E app
+            - name: Optimize E2E app
               run: |
-                  echo 'APP_ENV=prod' >> .env.local
-                  echo 'APP_DEBUG=0' >> .env.local
-                  symfony composer dump-autoload --classmap-authoritative --no-dev
-                  symfony composer dump-env
                   symfony console asset-map:compile
                   symfony console ux:icons:warm-cache
               working-directory: apps/e2e
@@ -96,21 +105,22 @@ jobs:
               working-directory: apps/e2e
 
             - name: Run browser tests
-              run: pnpm run test:browser
+              run: pnpm run test:browser --project ${{ matrix.browser }}
               id: browser-tests
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: ${{ always() && steps.browser-tests.conclusion == 'failure' }}
               with:
-                  name: Playwright report and output (${{ matrix.symfony }})
+                  name: Playwright report and output (${{ matrix.symfony }}, ${{ matrix.browser }})
                   path: |
-                      src/**/assets/.playwright-report/
-                      src/**/assets/.playwright-output/
+                      src/**/assets/playwright-report/
+                      src/**/assets/playwright-output/
                   retention-days: 7
+                  include-hidden-files: true
 
-            - uses: actions/upload-artifact@v4
+            - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
               if: ${{ always() && steps.browser-tests.conclusion == 'failure' }}
               with:
-                  name: Symfony logs (${{ matrix.symfony }})
+                  name: Symfony logs (${{ matrix.symfony }}, ${{ matrix.browser }})
                   path: apps/e2e/var/log/
                   retention-days: 7

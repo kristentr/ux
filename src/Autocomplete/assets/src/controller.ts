@@ -33,6 +33,7 @@ export default class extends Controller {
         minCharacters: Number,
         tomSelectOptions: Object,
         preload: String,
+        resetOnFocus: Boolean,
     };
 
     declare readonly urlValue: string;
@@ -46,6 +47,7 @@ export default class extends Controller {
     declare readonly tomSelectOptionsValue: object;
     declare readonly hasPreloadValue: boolean;
     declare readonly preloadValue: string;
+    declare readonly resetOnFocusValue: boolean;
     tomSelect: TomSelect | undefined;
 
     private mutationObserver: MutationObserver;
@@ -306,8 +308,10 @@ export default class extends Controller {
             // avoid extra filtering after results are returned
             score: (_search: string) => (_item: any) => 1,
             render: {
-                option: (item: any) => `<div>${item[labelField]}</div>`,
-                item: (item: any) => `<div>${item[labelField]}</div>`,
+                option: (item: any, escape: typeof escape_html) =>
+                    `<div>${this.optionsAsHtmlValue ? item[labelField] : escape(item[labelField])}</div>`,
+                item: (item: any, escape: typeof escape_html) =>
+                    `<div>${this.optionsAsHtmlValue ? item[labelField] : escape(item[labelField])}</div>`,
                 loading_more: (): string => {
                     return `<div class="loading-more-results">${this.loadingMoreTextValue}</div>`;
                 },
@@ -320,6 +324,20 @@ export default class extends Controller {
                 option_create: (data: TomOption, escapeData: typeof escape_html): string => {
                     return `<div class="create">${this.createOptionTextValue.replace('%placeholder%', `<strong>${escapeData(data.input)}</strong>`)}</div>`;
                 },
+            },
+            onFocus: () => {
+                if (this.resetOnFocusValue && this.tomSelect) {
+                    const query = this.tomSelect.control_input.value.trim();
+                    if (query === '') {
+                        this.tomSelect.clearOptions();
+                        this.tomSelect.loadedSearches = {};
+                        // Defined by the virtual_scroll plugin
+                        if (typeof this.tomSelect['clearPagination'] === 'function') {
+                            this.tomSelect['clearPagination']();
+                        }
+                        this.tomSelect.load('');
+                    }
+                }
             },
             preload: this.preload,
         });

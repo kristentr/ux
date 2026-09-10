@@ -1,5 +1,63 @@
 # CHANGELOG
 
+## 3.5
+
+- Translate the `optgroup` labels returned by the AJAX endpoint, so `group_by` can use translation keys
+- Add `EntityAutocompleterInterface::getTranslationDomain()` to choose the translation domain used for the `optgroup` labels
+- Decouple the package from Doctrine ORM: add `AutocompleterInterface`, `OptionsAwareAutocompleterInterface`, `AutocompleteChoiceType` and `#[AsAutocompleteField]` so any data source can back an autocomplete field. The Doctrine ORM API stays fully supported
+- Add the `ux_autocomplete` route, served by `AutocompleteController`. The `ux_entity_autocomplete` route alias is deprecated
+
+## 3.2
+
+- Fix the XSS vulnerability fix introduced in 3.1, which was broken on PostgreSQL. See section 2.36.2 below for details.
+
+## 3.1
+
+- Use `hash_equals()` to compare the `extra_options` checksum to prevent timing attacks
+- Fix XSS vulnerability where data returned from AJAX endpoints was rendered without HTML escaping.
+  See section 2.36 below for details.
+
+## 3.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- Remove `ParentEntityAutocompleteType` in favor of `BaseEntityAutocompleteType`
+- Remove `ExtraLazyChoiceLoader` in favor of `Symfony\Component\Form\ChoiceList\Loader\LazyChoiceLoader` from Symfony Form >=7.2
+- Add parameter `$security` to `AutocompleteResultsExecutor::__construct()`
+- Remove BC layer for `EntityAutocompleterInterface::getAttributes()` and `EntityAutocompleterInterface::getGroupBy()`
+
+## 2.36.2
+
+- Fix the autocomplete search query throwing an exception on PostgreSQL because of
+  the `ESCAPE '\'` clause introduced in 2.36; a backslash-free LIKE escape character is now used.
+
+## 2.36
+
+- Escape LIKE wildcards (`%` and `_`) in the autocomplete search query so user
+  input can no longer alter the matching behavior of the generated SQL query.
+- Fix XSS vulnerability where data returned from AJAX endpoints was rendered without HTML escaping.
+  Values from the `text` field of AJAX responses are now escaped by default.
+
+    **Possible BC break**: if your endpoint legitimately returns HTML in the `text` field (e.g., for rich content), opt in via the `options_as_html` option:
+
+    ```diff
+     #[AsEntityAutocompleteField]
+     class IngredientAutocompleteType extends AbstractType
+     {
+         public function configureOptions(OptionsResolver $resolver): void
+         {
+             $resolver->setDefaults([
+                 'class' => Ingredient::class,
+    +            'options_as_html' => true,
+             ]);
+         }
+     }
+    ```
+
+## 2.35
+
+- Add `reset_on_focus` option to clear and reload options when the autocomplete field regains focus
+
 ## 2.30
 
 - Ensure compatibility with PHP 8.5
@@ -45,7 +103,7 @@ class IngredientAutocompleteType extends AbstractType
 
 - Deprecate `ExtraLazyChoiceLoader` in favor of `Symfony\Component\Form\ChoiceList\Loader\LazyChoiceLoader`
 - Reset TomSelect when updating url attribute #1505
-- Add `getAttributes()` method to define additional attributes for autocomplete results #2541
+- Add `EntityAutocompleterInterface::getAttributes()` method to define additional attributes for autocomplete results #2541
 
 ## 2.22.0
 

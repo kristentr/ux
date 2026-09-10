@@ -19,13 +19,14 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\Options;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use Symfony\UX\Autocomplete\Form\ChoiceList\Loader\ExtraLazyChoiceLoader;
 
 /**
  * All form types that want to expose autocomplete functionality should use this for its getParent().
  */
 final class BaseEntityAutocompleteType extends AbstractType
 {
+    use AutocompleteTypeTrait;
+
     public function __construct(
         private UrlGeneratorInterface $urlGenerator,
     ) {
@@ -33,7 +34,7 @@ final class BaseEntityAutocompleteType extends AbstractType
 
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder->setAttribute('autocomplete_url', $this->getAutocompleteUrl($builder, $options));
+        $builder->setAttribute('autocomplete_url', $this->resolveAutocompleteUrl($builder, $options, AsEntityAutocompleteField::class));
     }
 
     public function configureOptions(OptionsResolver $resolver): void
@@ -43,11 +44,11 @@ final class BaseEntityAutocompleteType extends AbstractType
                 return null;
             }
 
-            if (class_exists(LazyChoiceLoader::class)) {
-                return new LazyChoiceLoader($loader);
+            if (!class_exists(LazyChoiceLoader::class)) {
+                throw new \LogicException(\sprintf('Using "%s" with "%s" requires symfony/form >= 7.2 to be installed. Try running "composer require symfony/form:>=7.2".', LazyChoiceLoader::class, __CLASS__));
             }
 
-            return new ExtraLazyChoiceLoader($loader);
+            return new LazyChoiceLoader($loader);
         };
 
         $resolver->setDefaults([
@@ -66,11 +67,14 @@ final class BaseEntityAutocompleteType extends AbstractType
             'security' => false,
             // set the max results number that a query on automatic endpoint return.
             'max_results' => 10,
+            // extra attributes to add to the autocomplete result, either an array or a callable (called with the entity)
+            'additional_attributes' => null,
         ]);
 
         $resolver->setAllowedTypes('security', ['boolean', 'string', 'callable']);
         $resolver->setAllowedTypes('max_results', ['int', 'null']);
         $resolver->setAllowedTypes('filter_query', ['callable', 'null']);
+        $resolver->setAllowedTypes('additional_attributes', ['null', 'callable', 'array']);
         $resolver->setNormalizer('searchable_fields', static function (Options $options, ?array $searchableFields) {
             if (null !== $searchableFields && null !== $options['filter_query']) {
                 throw new RuntimeException('Both the searchable_fields and filter_query options cannot be set.');
@@ -90,24 +94,8 @@ final class BaseEntityAutocompleteType extends AbstractType
         return 'ux_entity_autocomplete';
     }
 
-    /**
-     * Uses the provided URL, or auto-generate from the provided alias.
-     */
-    private function getAutocompleteUrl(FormBuilderInterface $builder, array $options): string
+    private function getUrlGenerator(): UrlGeneratorInterface
     {
-        if ($options['autocomplete_url']) {
-            return $options['autocomplete_url'];
-        }
-
-        $formType = $builder->getType()->getInnerType();
-        $attribute = AsEntityAutocompleteField::getInstance($formType::class);
-
-        if (!$attribute) {
-            throw new \LogicException(\sprintf('You must either provide your own autocomplete_url, or add #[AsEntityAutocompleteField] attribute to "%s".', $formType::class));
-        }
-
-        return $this->urlGenerator->generate($attribute->getRoute(), [
-            'alias' => $attribute->getAlias() ?: AsEntityAutocompleteField::shortName($formType::class),
-        ]);
+        return $this->urlGenerator;
     }
 }

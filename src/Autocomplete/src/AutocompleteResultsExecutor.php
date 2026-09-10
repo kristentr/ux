@@ -14,11 +14,12 @@ namespace Symfony\UX\Autocomplete;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\PropertyAccess\Exception\UnexpectedTypeException;
-use Symfony\Component\PropertyAccess\PropertyAccessor;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 use Symfony\Component\PropertyAccess\PropertyPath;
 use Symfony\Component\PropertyAccess\PropertyPathInterface;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
+use Symfony\Contracts\Translation\TranslatableInterface;
+use Symfony\Contracts\Translation\TranslatorInterface;
 use Symfony\UX\Autocomplete\Doctrine\DoctrineRegistryWrapper;
 
 /**
@@ -26,28 +27,31 @@ use Symfony\UX\Autocomplete\Doctrine\DoctrineRegistryWrapper;
  */
 final class AutocompleteResultsExecutor
 {
-    private PropertyAccessorInterface $propertyAccessor;
-    private ?Security $security;
-
     public function __construct(
-        private DoctrineRegistryWrapper $managerRegistry,
-        $propertyAccessor,
-        /* Security $security = null */
+        private ?DoctrineRegistryWrapper $managerRegistry,
+        private ?PropertyAccessorInterface $propertyAccessor = null,
+        private ?Security $security = null,
+        private ?TranslatorInterface $translator = null,
     ) {
-        if ($propertyAccessor instanceof Security) {
-            trigger_deprecation('symfony/ux-autocomplete', '2.8.0', 'Passing a "%s" instance as the second argument of "%s()" is deprecated, pass a "%s" instance instead.', Security::class, __METHOD__, PropertyAccessorInterface::class);
-            $this->security = $propertyAccessor;
-            $this->propertyAccessor = new PropertyAccessor();
-        } else {
-            $this->propertyAccessor = $propertyAccessor;
-            $this->security = \func_num_args() >= 3 ? func_get_arg(2) : null;
-        }
     }
 
-    public function fetchResults(EntityAutocompleterInterface $autocompleter, string $query, int $page): AutocompleteResults
+    public function fetchResults(AutocompleterInterface|EntityAutocompleterInterface $autocompleter, string $query, int $page): AutocompleteResults
     {
         if ($this->security && !$autocompleter->isGranted($this->security)) {
             throw new AccessDeniedException('Access denied from autocompleter class.');
+        }
+
+        if ($autocompleter instanceof AutocompleterInterface) {
+            return $autocompleter->fetchResults($query, $page);
+        }
+
+        return $this->fetchEntityResults($autocompleter, $query, $page);
+    }
+
+    private function fetchEntityResults(EntityAutocompleterInterface $autocompleter, string $query, int $page): AutocompleteResults
+    {
+        if (null === $this->managerRegistry) {
+            throw new \LogicException('Doctrine must be installed to use EntityAutocompleterInterface.');
         }
 
         $queryBuilder = $autocompleter->createFilteredQueryBuilder(
@@ -71,7 +75,7 @@ final class AutocompleteResultsExecutor
 
         $results = [];
 
-        if (!method_exists($autocompleter, 'getGroupBy') || null === $groupBy = $autocompleter->getGroupBy()) {
+        if (null === $groupBy = $autocompleter->getGroupBy()) {
             foreach ($paginator as $entity) {
                 $results[] = $this->formatResult($autocompleter, $entity);
             }
@@ -98,7 +102,9 @@ final class AutocompleteResultsExecutor
             throw new \InvalidArgumentException(\sprintf('Option "group_by" must be callable, "%s" given.', get_debug_type($groupBy)));
         }
 
-        $optgroupLabels = [];
+        $translationDomain = method_exists($autocompleter, 'getTranslationDomain') ? $autocompleter->getTranslationDomain() : null;
+
+        $optgroups = [];
 
         foreach ($paginator as $entity) {
             $result = $this->formatResult($autocompleter, $entity);
@@ -106,17 +112,39 @@ final class AutocompleteResultsExecutor
             $groupLabels = $groupBy($entity, $result['value'], $result['text']);
 
             if (null !== $groupLabels) {
-                $groupLabels = \is_array($groupLabels) ? array_map('strval', $groupLabels) : [(string) $groupLabels];
-                $result['group_by'] = $groupLabels;
-                $optgroupLabels = array_merge($optgroupLabels, $groupLabels);
+                $groupLabels = \is_array($groupLabels) ? $groupLabels : [$groupLabels];
+                $groupValues = [];
+
+                foreach ($groupLabels as $groupLabel) {
+                    $label = $this->translateGroupLabel($groupLabel, $translationDomain);
+                    // the value ties the results to their optgroup: keep the untranslated
+                    // one whenever it is available, so that it does not depend on the locale
+                    $value = $groupLabel instanceof TranslatableInterface ? $label : (string) $groupLabel;
+
+                    $groupValues[] = $value;
+                    $optgroups[$value] ??= ['value' => $value, 'label' => $label];
+                }
+
+                $result['group_by'] = $groupValues;
             }
 
             $results[] = $result;
         }
 
-        $optgroups = array_map(static fn (string $label) => ['value' => $label, 'label' => $label], array_unique($optgroupLabels));
+        return new AutocompleteResults($results, $hasNextPage, array_values($optgroups));
+    }
 
-        return new AutocompleteResults($results, $hasNextPage, $optgroups);
+    private function translateGroupLabel(mixed $groupLabel, string|false|null $translationDomain): string
+    {
+        if (null === $this->translator || false === $translationDomain) {
+            return (string) $groupLabel;
+        }
+
+        if ($groupLabel instanceof TranslatableInterface) {
+            return $groupLabel->trans($this->translator);
+        }
+
+        return $this->translator->trans((string) $groupLabel, [], $translationDomain);
     }
 
     /**
@@ -124,13 +152,8 @@ final class AutocompleteResultsExecutor
      */
     private function formatResult(EntityAutocompleterInterface $autocompleter, object $entity): array
     {
-        $attributes = [];
-        if (method_exists($autocompleter, 'getAttributes')) {
-            $attributes = $autocompleter->getAttributes($entity);
-        }
-
         return [
-            ...$attributes,
+            ...$autocompleter->getAttributes($entity),
             'value' => $autocompleter->getValue($entity),
             'text' => $autocompleter->getLabel($entity),
         ];

@@ -1,0 +1,8 @@
+{# @block content The descriptive text of the alert. #}
+<div
+    {{ attributes.defaults({
+        class: ''|tailwind_classes,
+    }) }}
+>
+    {%- block content %}{% endblock -%}
+</div>

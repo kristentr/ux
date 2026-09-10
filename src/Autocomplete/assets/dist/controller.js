@@ -275,8 +275,8 @@ function _createAutocompleteWithRemoteData(autocompleteEndpointUrl, minCharacter
 		optgroupField: "group_by",
 		score: (_search) => (_item) => 1,
 		render: {
-			option: (item) => `<div>${item[labelField]}</div>`,
-			item: (item) => `<div>${item[labelField]}</div>`,
+			option: (item, escape) => `<div>${this.optionsAsHtmlValue ? item[labelField] : escape(item[labelField])}</div>`,
+			item: (item, escape) => `<div>${this.optionsAsHtmlValue ? item[labelField] : escape(item[labelField])}</div>`,
 			loading_more: () => {
 				return `<div class="loading-more-results">${this.loadingMoreTextValue}</div>`;
 			},
@@ -288,6 +288,16 @@ function _createAutocompleteWithRemoteData(autocompleteEndpointUrl, minCharacter
 			},
 			option_create: (data, escapeData) => {
 				return `<div class="create">${this.createOptionTextValue.replace("%placeholder%", `<strong>${escapeData(data.input)}</strong>`)}</div>`;
+			}
+		},
+		onFocus: () => {
+			if (this.resetOnFocusValue && this.tomSelect) {
+				if (this.tomSelect.control_input.value.trim() === "") {
+					this.tomSelect.clearOptions();
+					this.tomSelect.loadedSearches = {};
+					if (typeof this.tomSelect["clearPagination"] === "function") this.tomSelect["clearPagination"]();
+					this.tomSelect.load("");
+				}
 			}
 		},
 		preload: this.preload
@@ -333,6 +343,7 @@ _Class.values = {
 	createOptionText: String,
 	minCharacters: Number,
 	tomSelectOptions: Object,
-	preload: String
+	preload: String,
+	resetOnFocus: Boolean
 };
 export { _Class as default };

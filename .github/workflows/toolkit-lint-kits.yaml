@@ -1,0 +1,71 @@
+name: Toolkit Lint Kits
+
+defaults:
+    run:
+        shell: bash
+
+on:
+    push:
+        branches-ignore:
+            - 'dependabot/**'
+        paths:
+            - 'src/Toolkit/**'
+            - '.github/workflows/toolkit-lint-kits.yaml'
+    pull_request:
+        paths:
+            - 'src/Toolkit/**'
+            - '.github/workflows/toolkit-lint-kits.yaml'
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+    cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+    discover:
+        name: Discover kits
+        runs-on: ubuntu-latest
+        outputs:
+            kits: ${{ steps.set.outputs.kits }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - id: set
+              name: Build matrix from src/Toolkit/kits/*
+              run: |
+                  KITS=$(find src/Toolkit/kits -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | jq -R . | jq -sc .)
+                  echo "Kits: $KITS"
+                  echo "kits=$KITS" >> "$GITHUB_OUTPUT"
+
+    lint:
+        name: Lint ${{ matrix.kit }}
+        needs: discover
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                kit: ${{ fromJson(needs.discover.outputs.kits) }}
+        steps:
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+              with:
+                  persist-credentials: false
+
+            - name: Setup PHP
+              uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+              with:
+                  php-version: '8.4'
+
+            - name: Install Toolkit dependencies
+              uses: ramsey/composer-install@65e4f84970763564f46a70b8a54b90d033b3bdda # 4.0.0
+              with:
+                  working-directory: src/Toolkit
+
+            - name: Lint kit
+              working-directory: src/Toolkit
+              env:
+                  COLUMNS: 120
+                  KIT: ${{ matrix.kit }}
+              run: php bin/ux-toolkit-kit-lint --ansi --fail-on-warning "kits/$KIT"

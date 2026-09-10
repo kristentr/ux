@@ -17,27 +17,24 @@ use Symfony\UX\LiveComponent\Metadata\LivePropMetadata;
 
 class LivePropMetadataTest extends TestCase
 {
-    public function testWithModifier()
+    public function testWithModifier(): void
     {
         $liveProp = new LiveProp(modifier: 'modifyProp');
         $livePropMetadata = new LivePropMetadata('propWithModifier', $liveProp, null, false, false, null);
 
-        $component = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['modifyProp'])
-            ->getMock();
-
-        $component
-            ->expects($this->once())
-            ->method('modifyProp')
-            ->with($liveProp, 'propWithModifier')
-            ->willReturn($liveProp->withFieldName('customField'));
+        $component = new class {
+            public function modifyProp(LiveProp $liveProp, string $propertyName): LiveProp
+            {
+                return $liveProp->withFieldName('customField');
+            }
+        };
 
         $livePropMetadata = $livePropMetadata->withModifier($component);
 
         $this->assertEquals('customField', $livePropMetadata->calculateFieldName($component, 'propWithModifier'));
     }
 
-    public function testWithModifierThrowsErrorIfNoMethodExistsInComponent()
+    public function testWithModifierThrowsErrorIfNoMethodExistsInComponent(): void
     {
         $liveProp = new LiveProp(modifier: 'modifyProp');
         $livePropMetadata = new LivePropMetadata('propWithModifier', $liveProp, null, false, false, null);
@@ -48,19 +45,17 @@ class LivePropMetadataTest extends TestCase
         $livePropMetadata->withModifier(new \stdClass());
     }
 
-    public function testWithModifierThrowsAnErrorIfModifierMethodDoesNotReturnLiveProp()
+    public function testWithModifierThrowsAnErrorIfModifierMethodDoesNotReturnLiveProp(): void
     {
         $liveProp = new LiveProp(modifier: 'modifyProp');
         $livePropMetadata = new LivePropMetadata('propWithModifier', $liveProp, null, false, false, null);
 
-        $component = $this->getMockBuilder(\stdClass::class)
-            ->addMethods(['modifyProp'])
-            ->getMock();
-
-        $component
-            ->expects($this->once())
-            ->method('modifyProp')
-            ->willReturn(false);
+        $component = new class {
+            public function modifyProp(LiveProp $liveProp, string $propertyName)
+            {
+                return false;
+            }
+        };
 
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessageMatches(\sprintf('/Method ".*::modifyProp\(\)" should return an instance of "%s" \(given: "bool"\)\./', preg_quote(LiveProp::class)));

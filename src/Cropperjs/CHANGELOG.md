@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 3.5.0
+
+- Add support for `intervention/image` 3 and 4, which fixes the deprecations triggered by version 2. Version 2 keeps working and stays the lowest supported version
+- Add a configurable image driver through the new `cropperjs.driver` option, accepting `gd` (default), `imagick` or `vips`. A custom driver service can be given through `cropperjs.driver_service`. Both require `intervention/image` 3 or higher
+
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- Always apply rotation in `Crop::getCroppedImage()` and `Crop::getCroppedThumbnail()`
+
+## 2.34
+
+- Deprecate calling `Crop::getCroppedImage()` and `Crop::getCroppedThumbnail()` without explicitly passing `true` for the $applyRotation parameter. It will always be `true` in 3.0
+
 ## 2.30
 
 - Ensure compatibility with PHP 8.5

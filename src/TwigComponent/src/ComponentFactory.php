@@ -11,8 +11,9 @@
 
 namespace Symfony\UX\TwigComponent;
 
+use Psr\Container\ContainerInterface;
 use Psr\EventDispatcher\EventDispatcherInterface;
-use Symfony\Component\DependencyInjection\ServiceLocator;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface as IntrospectableEventDispatcherInterface;
 use Symfony\Component\PropertyAccess\PropertyAccessorInterface;
 use Symfony\Contracts\Service\ResetInterface;
 use Symfony\UX\TwigComponent\Event\PostMountEvent;
@@ -30,25 +31,39 @@ final class ComponentFactory implements ResetInterface
     private array $mountMethods = [];
     private array $writableProperties = [];
 
+    /** @var array<string, ComponentMetadata> */
+    private array $metadata = [];
+
+    /**
+     * Set when the dispatcher can be asked whether an event has listeners,
+     * allowing to skip creating and dispatching events nobody listens to.
+     */
+    private readonly ?IntrospectableEventDispatcherInterface $introspectableDispatcher;
+
     /**
      * @param array<string, array>        $config
      * @param array<class-string, string> $classMap
      */
     public function __construct(
         private ComponentTemplateFinderInterface $componentTemplateFinder,
-        private ServiceLocator $components,
+        private ContainerInterface $components,
         private PropertyAccessorInterface $propertyAccessor,
         private EventDispatcherInterface $eventDispatcher,
         private array $config,
         private readonly array $classMap,
         private readonly Environment $twig,
     ) {
+        $this->introspectableDispatcher = $eventDispatcher instanceof IntrospectableEventDispatcherInterface ? $eventDispatcher : null;
     }
 
     public function metadataFor(string $name): ComponentMetadata
     {
+        if ($metadata = $this->metadata[$name] ?? null) {
+            return $metadata;
+        }
+
         if ($config = $this->config[$name] ?? null) {
-            return new ComponentMetadata($config);
+            return $this->metadata[$name] = new ComponentMetadata($config);
         }
 
         if ($template = $this->componentTemplateFinder->findAnonymousComponentTemplate($name)) {
@@ -57,12 +72,12 @@ final class ComponentFactory implements ResetInterface
                 'template' => $template,
             ];
 
-            return new ComponentMetadata($this->config[$name]);
+            return $this->metadata[$name] = new ComponentMetadata($this->config[$name]);
         }
 
         if ($mappedName = $this->classMap[$name] ?? null) {
             if ($config = $this->config[$mappedName] ?? null) {
-                return new ComponentMetadata($config);
+                return $this->metadata[$name] = $this->metadata[$mappedName] ??= new ComponentMetadata($config);
             }
 
             throw new \InvalidArgumentException(\sprintf('Unknown component "%s".', $name));
@@ -91,8 +106,7 @@ final class ComponentFactory implements ResetInterface
     public function mountFromObject(object $component, array $data, ComponentMetadata $componentMetadata): MountedComponent
     {
         $originalData = $data;
-        $event = $this->preMount($component, $data, $componentMetadata);
-        $data = $event->getData();
+        $this->preMount($component, $data, $componentMetadata);
 
         $this->mount($component, $data, $componentMetadata);
 
@@ -106,8 +120,7 @@ final class ComponentFactory implements ResetInterface
             }
         }
 
-        $postMount = $this->postMount($component, $data, $componentMetadata);
-        $data = $postMount->getData();
+        $extraMetadata = $this->postMount($component, $data, $componentMetadata);
 
         // create attributes from "attributes" key if exists
         $attributesVar = $componentMetadata->getAttributesVar();
@@ -125,7 +138,7 @@ final class ComponentFactory implements ResetInterface
             $component,
             new ComponentAttributes([...$attributes, ...$data], $this->twig->getRuntime(EscaperRuntime::class)),
             $originalData,
-            $postMount->getExtraMetadata(),
+            $extraMetadata,
         );
     }
 
@@ -157,7 +170,7 @@ final class ComponentFactory implements ResetInterface
             return;
         }
 
-        $mount = $this->mountMethods[$component::class] ??= (new \ReflectionClass($component))->getMethod('mount');
+        $mount = $this->mountMethods[$component::class] ??= new \ReflectionClass($component)->getMethod('mount');
 
         $parameters = [];
         foreach ($mount->getParameters() as $refParameter) {
@@ -175,34 +188,41 @@ final class ComponentFactory implements ResetInterface
         $mount->invoke($component, ...$parameters);
     }
 
-    private function preMount(object $component, array $data, ComponentMetadata $componentMetadata): PreMountEvent
+    private function preMount(object $component, array &$data, ComponentMetadata $componentMetadata): void
     {
-        $event = new PreMountEvent($component, $data, $componentMetadata);
-        $this->eventDispatcher->dispatch($event);
+        if (null === $this->introspectableDispatcher || $this->introspectableDispatcher->hasListeners(PreMountEvent::class)) {
+            $event = new PreMountEvent($component, $data, $componentMetadata);
+            $this->eventDispatcher->dispatch($event);
+            $data = $event->getData();
+        }
 
-        $data = $event->getData();
         foreach ($componentMetadata->getPreMounts() as $preMount) {
             if (null !== $newData = $component->$preMount($data)) {
-                $event->setData($data = $newData);
+                $data = $newData;
             }
         }
-
-        return $event;
     }
 
-    private function postMount(object $component, array $data, ComponentMetadata $componentMetadata): PostMountEvent
+    /**
+     * @return array The extra metadata collected by the listeners
+     */
+    private function postMount(object $component, array &$data, ComponentMetadata $componentMetadata): array
     {
-        $event = new PostMountEvent($component, $data, $componentMetadata);
-        $this->eventDispatcher->dispatch($event);
+        $extraMetadata = [];
+        if (null === $this->introspectableDispatcher || $this->introspectableDispatcher->hasListeners(PostMountEvent::class)) {
+            $event = new PostMountEvent($component, $data, $componentMetadata);
+            $this->eventDispatcher->dispatch($event);
+            $data = $event->getData();
+            $extraMetadata = $event->getExtraMetadata();
+        }
 
-        $data = $event->getData();
         foreach ($componentMetadata->getPostMounts() as $postMount) {
             if (null !== $newData = $component->$postMount($data)) {
-                $event->setData($data = $newData);
+                $data = $newData;
             }
         }
 
-        return $event;
+        return $extraMetadata;
     }
 
     /**
@@ -243,5 +263,6 @@ final class ComponentFactory implements ResetInterface
     {
         $this->mountMethods = [];
         $this->writableProperties = [];
+        $this->metadata = [];
     }
 }

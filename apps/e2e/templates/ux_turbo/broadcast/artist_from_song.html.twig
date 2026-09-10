@@ -1,0 +1,35 @@
+{% extends 'example.html.twig' %}
+
+{% block example %}
+    <twig:Turbo:Stream:From topics="App\\Entity\\Turbo\\Artist" />
+
+    <h2 class="h4 mb-3">Turbo Broadcast — Update Artist via Song (entity proxy)</h2>
+
+    <div class="row g-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Live list</div>
+                <div class="card-body">
+                    <div id="artists-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">Trigger update from Song</div>
+                <div class="card-body">
+                    <turbo-frame id="api">
+                        <form method="post" enctype="application/x-www-form-urlencoded">
+                            <div class="mb-3">
+                                <label for="afs-song-id" class="form-label">Song ID</label>
+                                <input id="afs-song-id" class="form-control" name="id" value="{{ song ? song.id }}">
+                            </div>
+                            <button id="afs-submit" type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                    </turbo-frame>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -22,8 +22,6 @@ use Symfony\UX\Translator\MessageParameters\Printer\TypeScriptMessageParametersP
  *
  * @final
  *
- * @experimental
- *
  * @phpstan-type Domain string
  * @phpstan-type Locale string
  * @phpstan-type MessageId string
@@ -99,29 +97,31 @@ class TranslationsDumper
             );
         }
 
+        $additions = [];
+        $typescriptAdditions = [];
         foreach ($this->getTranslations($catalogues, $excludedDomains, $includedDomains, $includeKeysRegex, $excludeKeysRegex) as $translationId => $translationsByDomainAndLocale) {
             $translationId = str_replace('"', '\\"', $translationId);
-            $this->filesystem->appendToFile($fileIndexJs, \sprintf(
+
+            $additions[] = \sprintf(
                 '    "%s": %s,%s',
                 $translationId,
                 json_encode(['translations' => $translationsByDomainAndLocale], \JSON_THROW_ON_ERROR),
                 "\n"
-            ));
+            );
 
             if ($dumpTypeScript) {
-                $this->filesystem->appendToFile($fileIndexDts, \sprintf(
+                $typescriptAdditions[] = \sprintf(
                     '    "%s": %s;%s',
                     $translationId,
                     $this->getTranslationsTypeScriptTypeDefinition($translationsByDomainAndLocale),
                     "\n"
-                ));
+                );
             }
         }
 
-        $this->filesystem->appendToFile($fileIndexJs, '};'."\n");
-
+        $this->filesystem->appendToFile($fileIndexJs, implode('', $additions).'};'."\n");
         if ($dumpTypeScript) {
-            $this->filesystem->appendToFile($fileIndexDts, '};'."\n");
+            $this->filesystem->appendToFile($fileIndexDts, implode('', $typescriptAdditions).'};'."\n");
         }
     }
 

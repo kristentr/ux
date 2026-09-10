@@ -9,7 +9,7 @@
  * file that was distributed with this source code.
  */
 
-namespace src\Turbo\tests\Compiler;
+namespace Symfony\UX\Turbo\Tests\Compiler;
 
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
@@ -17,7 +17,7 @@ use Symfony\UX\Turbo\DependencyInjection\Compiler\RegisterMercureHubsPass;
 
 final class RegisterMercureHubsPassTest extends TestCase
 {
-    public function testProcess()
+    public function testProcess(): void
     {
         $pass = new RegisterMercureHubsPass();
 
@@ -28,10 +28,11 @@ final class RegisterMercureHubsPassTest extends TestCase
         $pass->process($container);
 
         $this->assertTrue($container->has('turbo.mercure.hub.renderer'));
+        $this->assertTrue($container->has('turbo.mercure.hub.stream_source_renderer'));
         $this->assertTrue($container->has('turbo.mercure.hub.broadcaster'));
     }
 
-    public function testProcessWithDefault()
+    public function testProcessWithDefault(): void
     {
         $pass = new RegisterMercureHubsPass();
 
@@ -47,5 +48,9 @@ final class RegisterMercureHubsPassTest extends TestCase
         $this->assertSame([
             'transport' => 'default',
         ], $container->getDefinition('turbo.mercure.default_hub.renderer')->getTag('turbo.renderer.stream_listen')[1]);
+
+        $this->assertSame([
+            'transport' => 'default',
+        ], $container->getDefinition('turbo.mercure.default_hub.stream_source_renderer')->getTag('turbo.stream_source_renderer')[1]);
     }
 }

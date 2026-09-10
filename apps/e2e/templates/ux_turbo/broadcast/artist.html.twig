@@ -1,0 +1,17 @@
+{% extends 'example.html.twig' %}
+
+{% block example %}
+    <twig:Turbo:Stream:From topics="{{ 'songs_by_artist_' ~ artist.id }}" />
+
+    <h2 class="h4 mb-1">
+        Artist {{ artist.name }}
+        <small class="text-muted">#{{ artist.id }}</small>
+    </h2>
+
+    <div class="card mt-3">
+        <div class="card-header">Songs</div>
+        <div class="card-body">
+            <div id="songs-list"></div>
+        </div>
+    </div>
+{% endblock %}

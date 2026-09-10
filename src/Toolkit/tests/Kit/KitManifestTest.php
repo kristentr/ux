@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Symfony package.
  *
@@ -14,11 +12,14 @@ declare(strict_types=1);
 namespace Symfony\UX\Toolkit\Tests\Kit;
 
 use PHPUnit\Framework\TestCase;
+use Symfony\UX\Toolkit\Dependency\ImportmapPackageDependency;
+use Symfony\UX\Toolkit\Dependency\NpmPackageDependency;
+use Symfony\UX\Toolkit\Dependency\PhpPackageDependency;
 use Symfony\UX\Toolkit\Kit\KitManifest;
 
 final class KitManifestTest extends TestCase
 {
-    public function testFromJsonWithInvalidJson()
+    public function testFromJsonWithInvalidJson(): void
     {
         $this->expectException(\JsonException::class);
         $this->expectExceptionMessage('Syntax error');
@@ -26,7 +27,7 @@ final class KitManifestTest extends TestCase
         KitManifest::fromJson('test');
     }
 
-    public function testFromJsonWithEmpty()
+    public function testFromJsonWithEmpty(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Property "name" is required.');
@@ -34,7 +35,7 @@ final class KitManifestTest extends TestCase
         KitManifest::fromJson('{}');
     }
 
-    public function testFromJsonWithMissingDescription()
+    public function testFromJsonWithMissingDescription(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Property "description" is required.');
@@ -46,7 +47,7 @@ final class KitManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithMissingLicense()
+    public function testFromJsonWithMissingLicense(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Property "license" is required.');
@@ -59,7 +60,7 @@ final class KitManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithMissingHomepage()
+    public function testFromJsonWithMissingHomepage(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Property "homepage" is required.');
@@ -73,7 +74,7 @@ final class KitManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithInvalidHomepage()
+    public function testFromJsonWithInvalidHomepage(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid homepage URL "not-a-url".');
@@ -88,7 +89,7 @@ final class KitManifestTest extends TestCase
             JSON);
     }
 
-    public function testFromJsonWithValidData()
+    public function testFromJsonWithValidData(): void
     {
         $manifest = KitManifest::fromJson(<<<JSON
                 {
@@ -103,5 +104,65 @@ final class KitManifestTest extends TestCase
         $this->assertSame('A kit', $manifest->description);
         $this->assertSame('MIT', $manifest->license);
         $this->assertSame('https://example.com', $manifest->homepage);
+        $this->assertSame([], $manifest->dependencies);
+        $this->assertNull($manifest->color);
+        $this->assertNull($manifest->icon);
+    }
+
+    public function testFromJsonWithColorAndIcon(): void
+    {
+        $manifest = KitManifest::fromJson(<<<JSON
+                {
+                    "name": "kit",
+                    "description": "A kit",
+                    "license": "MIT",
+                    "homepage": "https://example.com",
+                    "color": "#000000",
+                    "icon": "icon.svg"
+                }
+            JSON);
+
+        $this->assertSame('#000000', $manifest->color);
+        $this->assertSame('icon.svg', $manifest->icon);
+    }
+
+    public function testFromJsonWithDependencies(): void
+    {
+        $manifest = KitManifest::fromJson(<<<JSON
+                {
+                    "name": "kit",
+                    "description": "A kit",
+                    "license": "MIT",
+                    "homepage": "https://example.com",
+                    "dependencies": {
+                        "composer": ["twig/extra-bundle"],
+                        "npm": ["flowbite"],
+                        "importmap": ["flowbite"]
+                    }
+                }
+            JSON);
+
+        $this->assertCount(3, $manifest->dependencies);
+        $this->assertInstanceOf(PhpPackageDependency::class, $manifest->dependencies[0]);
+        $this->assertInstanceOf(NpmPackageDependency::class, $manifest->dependencies[1]);
+        $this->assertInstanceOf(ImportmapPackageDependency::class, $manifest->dependencies[2]);
+    }
+
+    public function testFromJsonRejectsRecipeDependency(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('The dependency types "recipe" are not supported.');
+
+        KitManifest::fromJson(<<<JSON
+                {
+                    "name": "kit",
+                    "description": "A kit",
+                    "license": "MIT",
+                    "homepage": "https://example.com",
+                    "dependencies": {
+                        "recipe": ["Button"]
+                    }
+                }
+            JSON);
     }
 }

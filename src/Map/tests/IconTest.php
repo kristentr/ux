@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\Map\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Map\Icon\Icon;
 use Symfony\UX\Map\Icon\SvgIcon;
@@ -39,27 +40,22 @@ class IconTest extends TestCase
     }
 
     /**
-     * @dataProvider provideIcons
-     *
      * @param class-string<Icon> $expectedInstance
      */
-    public function testIconConstruction(Icon $icon, string $expectedInstance, array $expectedToArray)
+    #[DataProvider('provideIcons')]
+    public function testIconConstruction(Icon $icon, string $expectedInstance, array $expectedToArray): void
     {
         self::assertInstanceOf($expectedInstance, $icon);
     }
 
-    /**
-     * @dataProvider provideIcons
-     */
-    public function testToArray(Icon $icon, string $expectedInstance, array $expectedToArray)
+    #[DataProvider('provideIcons')]
+    public function testToArray(Icon $icon, string $expectedInstance, array $expectedToArray): void
     {
         self::assertSame($expectedToArray, $icon->toArray());
     }
 
-    /**
-     * @dataProvider provideIcons
-     */
-    public function testFromArray(Icon $icon, string $expectedInstance, array $expectedToArray)
+    #[DataProvider('provideIcons')]
+    public function testFromArray(Icon $icon, string $expectedInstance, array $expectedToArray): void
     {
         self::assertEquals($icon, Icon::fromArray($expectedToArray));
     }
@@ -84,10 +80,8 @@ class IconTest extends TestCase
         }
     }
 
-    /**
-     * @dataProvider dataProviderForTestSvgIconCustomizationMethodsCanNotBeCalled
-     */
-    public function testSvgIconCustomizationMethodsCanNotBeCalled(string $method, mixed ...$args)
+    #[DataProvider('dataProviderForTestSvgIconCustomizationMethodsCanNotBeCalled')]
+    public function testSvgIconCustomizationMethodsCanNotBeCalled(string $method, mixed ...$args): void
     {
         $this->expectException(\LogicException::class);
         if (\in_array($method, ['width', 'height'], true)) {

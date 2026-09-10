@@ -11,15 +11,14 @@
 
 namespace Symfony\UX\Toolkit\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\Toolkit\Assert;
 
 class AssertTest extends TestCase
 {
-    /**
-     * @dataProvider provideValidKitNames
-     */
-    public function testValidKitName(string $name)
+    #[DataProvider('provideValidKitNames')]
+    public function testValidKitName(string $name): void
     {
         $this->expectNotToPerformAssertions();
 
@@ -50,10 +49,8 @@ class AssertTest extends TestCase
         yield ['my_kit'];
     }
 
-    /**
-     * @dataProvider provideInvalidKitNames
-     */
-    public function testInvalidKitName(string $name)
+    #[DataProvider('provideInvalidKitNames')]
+    public function testInvalidKitName(string $name): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(\sprintf('Invalid kit name "%s".', $name));
@@ -82,10 +79,8 @@ class AssertTest extends TestCase
         yield ['.abc'];
     }
 
-    /**
-     * @dataProvider provideValidComponentNames
-     */
-    public function testValidComponentName(string $name)
+    #[DataProvider('provideValidComponentNames')]
+    public function testValidComponentName(string $name): void
     {
         $this->expectNotToPerformAssertions();
 
@@ -106,10 +101,8 @@ class AssertTest extends TestCase
         yield ['Component123:Sub456'];
     }
 
-    /**
-     * @dataProvider provideInvalidComponentNames
-     */
-    public function testInvalidComponentName(string $name)
+    #[DataProvider('provideInvalidComponentNames')]
+    public function testInvalidComponentName(string $name): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(\sprintf('Invalid component name "%s".', $name));
@@ -143,10 +136,8 @@ class AssertTest extends TestCase
         yield ['123:456'];
     }
 
-    /**
-     * @dataProvider provideValidPhpPackageNames
-     */
-    public function testValidPhpPackageName(string $name)
+    #[DataProvider('provideValidPhpPackageNames')]
+    public function testValidPhpPackageName(string $name): void
     {
         $this->expectNotToPerformAssertions();
 
@@ -159,10 +150,8 @@ class AssertTest extends TestCase
         yield ['tales-from-a-dev/twig-tailwind-extra'];
     }
 
-    /**
-     * @dataProvider provideInvalidPhpPackageNames
-     */
-    public function testInvalidPhpPackageName(string $name)
+    #[DataProvider('provideInvalidPhpPackageNames')]
+    public function testInvalidPhpPackageName(string $name): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(\sprintf('Invalid PHP package name "%s".', $name));
@@ -178,10 +167,8 @@ class AssertTest extends TestCase
         yield ['twig/html-extra/twig'];
     }
 
-    /**
-     * @dataProvider provideValidNpmPackageNames
-     */
-    public function testValidNpmPackageName(string $name)
+    #[DataProvider('provideValidNpmPackageNames')]
+    public function testValidNpmPackageName(string $name): void
     {
         $this->expectNotToPerformAssertions();
 
@@ -202,10 +189,8 @@ class AssertTest extends TestCase
         yield ['~foo'];
     }
 
-    /**
-     * @dataProvider provideInvalidNpmPackageNames
-     */
-    public function testInvalidNpmPackageName(string $name)
+    #[DataProvider('provideInvalidNpmPackageNames')]
+    public function testInvalidNpmPackageName(string $name): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage(\sprintf('Invalid NPM package name "%s".', $name));
@@ -223,5 +208,134 @@ class AssertTest extends TestCase
         yield ['my@package'];
         yield ['my/package/name'];
         yield ['@scope//my-package'];
+    }
+
+    #[DataProvider('provideNonEscapingPaths')]
+    public function testPathDoesNotEscapeDirectoryWithValidPath(string $path): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        Assert::pathDoesNotEscapeDirectory($path);
+    }
+
+    public static function provideNonEscapingPaths(): iterable
+    {
+        yield ['templates/'];
+        yield ['templates/components/Button.html.twig'];
+        yield ['templates/components/Table/Body.html.twig'];
+        // A leading ".." in a segment name is fine as long as it is not a ".." segment.
+        yield ['..foo'];
+        yield ['templates/..foo.twig'];
+    }
+
+    #[DataProvider('provideEscapingPaths')]
+    public function testPathDoesNotEscapeDirectoryWithTraversingPath(string $path): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(\sprintf('The path "%s" must not escape its target directory.', $path));
+
+        Assert::pathDoesNotEscapeDirectory($path);
+    }
+
+    public static function provideEscapingPaths(): iterable
+    {
+        yield ['..'];
+        yield ['../templates'];
+        yield ['../../../../tmp/PWNED'];
+        yield ['templates/../../etc/passwd'];
+        // Backslash separator (Windows-style) must be rejected too.
+        yield ['..\\..\\tmp\\PWNED'];
+        yield ['templates\\..\\..\\etc'];
+    }
+
+    #[DataProvider('provideValidPropNames')]
+    public function testValidPropName(string $name): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        Assert::propName($name);
+    }
+
+    public static function provideValidPropNames(): iterable
+    {
+        yield ['id'];
+        yield ['variant'];
+        yield ['openOnLoad'];
+        yield ['asIcon'];
+        yield ['defaultValue'];
+        yield ['as'];
+        yield ['a'];
+        yield ['value123'];
+    }
+
+    #[DataProvider('provideInvalidPropNames')]
+    public function testInvalidPropName(string $name): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid prop name "%s".', $name));
+
+        Assert::propName($name);
+    }
+
+    public static function provideInvalidPropNames(): iterable
+    {
+        yield [''];
+        // Uppercase start
+        yield ['Variant'];
+        // Underscore
+        yield ['bad_name'];
+        // Digit start
+        yield ['1prop'];
+        // Hyphen
+        yield ['my-prop'];
+        // Space
+        yield ['foo bar'];
+    }
+
+    #[DataProvider('provideValidBlockNames')]
+    public function testValidBlockName(string $name): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        Assert::blockName($name);
+    }
+
+    public static function provideValidBlockNames(): iterable
+    {
+        yield ['content'];
+        yield ['icon'];
+        yield ['Content'];
+        yield ['myBlock'];
+        yield ['block_1'];
+        yield ['_private'];
+    }
+
+    #[DataProvider('provideInvalidBlockNames')]
+    public function testInvalidBlockName(string $name): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage(\sprintf('Invalid block name "%s".', $name));
+
+        Assert::blockName($name);
+    }
+
+    public static function provideInvalidBlockNames(): iterable
+    {
+        yield [''];
+        // Digit start
+        yield ['1bad'];
+        // Hyphen
+        yield ['bad-name'];
+        // Space
+        yield ['a b'];
+        // Dot
+        yield ['has.dot'];
+    }
+
+    public function testCommonMarkAvailableDoesNotThrowWhenInstalled(): void
+    {
+        $this->expectNotToPerformAssertions();
+
+        Assert::commonMarkAvailable();
     }
 }

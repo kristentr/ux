@@ -17,7 +17,7 @@ use Symfony\UX\Toolkit\Dependency\NpmPackageDependency;
 
 class NpmPackageDependencyTest extends TestCase
 {
-    public function testShouldBeInstantiable()
+    public function testShouldBeInstantiable(): void
     {
         $dependency = new NpmPackageDependency('react');
         $this->assertSame('react', $dependency->name);
@@ -27,11 +27,11 @@ class NpmPackageDependencyTest extends TestCase
 
         $dependency = new NpmPackageDependency('react', new ConstraintVersion('^18.0.0'));
         $this->assertSame('react', $dependency->name);
-        $this->assertSame('NPM package "react:^18.0.0"', $dependency->toDebug());
-        $this->assertSame('react:^18.0.0', (string) $dependency);
+        $this->assertSame('NPM package "react@^18.0.0"', $dependency->toDebug());
+        $this->assertSame('react@^18.0.0', (string) $dependency);
     }
 
-    public function testShouldFailIfPackageNameIsInvalid()
+    public function testShouldFailIfPackageNameIsInvalid(): void
     {
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessage('Invalid NPM package name "/foo".');

@@ -1,8 +1,8 @@
+/vendor/
 /config/reference.php
-/vendor
+/config/schema.json
 /composer.lock
-/.phpunit.result.cache
+/phpunit.xml
+/.phpunit.cache
 /.twig-cs-fixer.cache
-var
-tests/ui/output
-tests/ui/screens
+/var

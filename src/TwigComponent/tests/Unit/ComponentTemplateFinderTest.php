@@ -12,7 +12,6 @@
 namespace Symfony\UX\TwigComponent\Tests\Unit;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Bridge\PhpUnit\ExpectDeprecationTrait;
 use Symfony\UX\TwigComponent\ComponentTemplateFinder;
 use Twig\Environment;
 use Twig\Loader\ArrayLoader;
@@ -23,9 +22,7 @@ use Twig\Loader\LoaderInterface;
  */
 final class ComponentTemplateFinderTest extends TestCase
 {
-    use ExpectDeprecationTrait;
-
-    public function testFindTemplate()
+    public function testFindTemplate(): void
     {
         $templates = [
             'components/aa.html.twig',
@@ -49,68 +46,7 @@ final class ComponentTemplateFinderTest extends TestCase
         $this->assertNull($finder->findAnonymousComponentTemplate('c'));
     }
 
-    /**
-     * @group legacy
-     */
-    public function testFindTemplateWithLegacyAutonaming()
-    {
-        $templates = [
-            'components/aa.html.twig',
-            'components/aa:bb.html.twig',
-            'components/aa/bb.html.twig',
-            'a',
-            'components/b',
-            'components/b.html.twig',
-            'b',
-            'b.html.twig',
-            'components/c',
-            'c',
-            'c.html.twig',
-            'd',
-            'components/d',
-        ];
-        $environment = $this->createEnvironment($templates);
-
-        $this->expectDeprecation('Since symfony/ux-twig-component 2.13: The "Symfony\UX\TwigComponent\ComponentTemplateFinder::__construct()" method will require "string $directory" argument in 3.0. Not defining it or passing null is deprecated.');
-        $finder = new ComponentTemplateFinder($environment);
-
-        $this->assertEquals('components/aa.html.twig', $finder->findAnonymousComponentTemplate('aa'));
-        $this->assertEquals('components/aa/bb.html.twig', $finder->findAnonymousComponentTemplate('aa:bb'));
-        $this->assertEquals('components/b.html.twig', $finder->findAnonymousComponentTemplate('b'));
-        $this->assertEquals('components/b.html.twig', $finder->findAnonymousComponentTemplate('components:b'));
-        $this->assertEquals('c.html.twig', $finder->findAnonymousComponentTemplate('c'));
-        $this->assertEquals('components/d', $finder->findAnonymousComponentTemplate('d'));
-
-        $this->assertNull($finder->findAnonymousComponentTemplate('nope'));
-        $this->assertNull($finder->findAnonymousComponentTemplate('nope:bar'));
-    }
-
-    /**
-     * @group legacy
-     */
-    public function testTriggerDeprecationWhenEnvironmentAsFirstArgument()
-    {
-        $environment = $this->createEnvironment([]);
-
-        $this->expectDeprecation('Since symfony/ux-twig-component 2.13: The "Symfony\UX\TwigComponent\ComponentTemplateFinder::__construct()" method will require "Twig\Loader\LoaderInterface $loader" as first argument in 3.0. Passing an "Environment" instance is deprecated.');
-        $finder = new ComponentTemplateFinder($environment, 'foo');
-    }
-
-    /**
-     * @group legacy
-     */
-    public function testTriggerDeprecationWhenDirectoryArgumentIsNullOrNotProvided()
-    {
-        $environment = $this->createEnvironment([]);
-
-        $this->expectDeprecation('Since symfony/ux-twig-component 2.13: The "Symfony\UX\TwigComponent\ComponentTemplateFinder::__construct()" method will require "string $directory" argument in 3.0. Not defining it or passing null is deprecated.');
-        $finder = new ComponentTemplateFinder($environment);
-
-        $this->expectDeprecation('Since symfony/ux-twig-component 2.13: The "Symfony\UX\TwigComponent\ComponentTemplateFinder::__construct()" method will require "string $directory" argument in 3.0. Not defining it or passing null is deprecated.');
-        $finder = new ComponentTemplateFinder($environment, null);
-    }
-
-    public function testFindTemplateWithinDirectory()
+    public function testFindTemplateWithinDirectory(): void
     {
         $templates = [
             'bar.html.twig',
@@ -131,7 +67,7 @@ final class ComponentTemplateFinderTest extends TestCase
         $this->assertEquals('foo/foo/baz/index.html.twig', $finder->findAnonymousComponentTemplate('foo:baz'));
     }
 
-    public function testFindTemplateFromExternalBundle()
+    public function testFindTemplateFromExternalBundle(): void
     {
         $templates = [
             '@Acme/components/Button.html.twig',
@@ -205,7 +141,7 @@ final class ComponentTemplateFinderTest extends TestCase
         $this->assertSame('@Acme/components/Index/index.html.twig', $finderWithoutIndexHtml->findAnonymousComponentTemplate('Acme:Index'));
     }
 
-    public function testFindTemplateFromExternalBundleWithPrecedence()
+    public function testFindTemplateFromExternalBundleWithPrecedence(): void
     {
         $templates = [
             '@Acme/components/Button.html.twig',

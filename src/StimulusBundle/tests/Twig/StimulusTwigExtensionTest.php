@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\StimulusBundle\Tests\Twig;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\UX\StimulusBundle\Helper\StimulusHelper;
 use Symfony\UX\StimulusBundle\Tests\StimulusIntegrationTestKernel;
@@ -29,10 +30,8 @@ final class StimulusTwigExtensionTest extends TestCase
         $this->twig = $container->get(Environment::class);
     }
 
-    /**
-     * @dataProvider provideRenderStimulusController
-     */
-    public function testRenderStimulusController(string $controllerName, array $controllerValues, array $controllerClasses, array $controllerOutlets, string $expectedString, array $expectedArray)
+    #[DataProvider('provideRenderStimulusController')]
+    public function testRenderStimulusController(string $controllerName, array $controllerValues, array $controllerClasses, array $controllerOutlets, string $expectedString, array $expectedArray): void
     {
         $extension = new StimulusTwigExtension(new StimulusHelper($this->twig));
         $dto = $extension->renderStimulusController($controllerName, $controllerValues, $controllerClasses, $controllerOutlets);
@@ -130,7 +129,7 @@ final class StimulusTwigExtensionTest extends TestCase
         ];
     }
 
-    public function testAppendStimulusController()
+    public function testAppendStimulusController(): void
     {
         $extension = new StimulusTwigExtension(new StimulusHelper($this->twig));
         $dto = $extension->renderStimulusController('my-controller', ['myValue' => 'scalar-value']);
@@ -140,10 +139,8 @@ final class StimulusTwigExtensionTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider provideRenderStimulusAction
-     */
-    public function testRenderStimulusAction(string $controllerName, ?string $actionName, ?string $eventName, array $parameters, string $expectedString, array $expectedArray)
+    #[DataProvider('provideRenderStimulusAction')]
+    public function testRenderStimulusAction(string $controllerName, ?string $actionName, ?string $eventName, array $parameters, string $expectedString, array $expectedArray): void
     {
         $extension = new StimulusTwigExtension(new StimulusHelper($this->twig));
         $dto = $extension->renderStimulusAction($controllerName, $actionName, $eventName, $parameters);
@@ -208,7 +205,7 @@ final class StimulusTwigExtensionTest extends TestCase
         ];
     }
 
-    public function testAppendStimulusAction()
+    public function testAppendStimulusAction(): void
     {
         $extension = new StimulusTwigExtension(new StimulusHelper($this->twig));
         $dto = $extension->renderStimulusAction('my-controller', 'onClick', 'click');
@@ -218,10 +215,8 @@ final class StimulusTwigExtensionTest extends TestCase
         );
     }
 
-    /**
-     * @dataProvider provideRenderStimulusTarget
-     */
-    public function testRenderStimulusTarget(string $controllerName, ?string $targetName, string $expectedString, array $expectedArray)
+    #[DataProvider('provideRenderStimulusTarget')]
+    public function testRenderStimulusTarget(string $controllerName, ?string $targetName, string $expectedString, array $expectedArray): void
     {
         $extension = new StimulusTwigExtension(new StimulusHelper($this->twig));
         $dto = $extension->renderStimulusTarget($controllerName, $targetName);
@@ -246,13 +241,29 @@ final class StimulusTwigExtensionTest extends TestCase
         ];
     }
 
-    public function testAppendStimulusTarget()
+    public function testAppendStimulusTarget(): void
     {
         $extension = new StimulusTwigExtension(new StimulusHelper($this->twig));
         $dto = $extension->renderStimulusTarget('my-controller', 'myTarget');
         $this->assertSame(
             'data-my-controller-target="myTarget" data-symfony--ux-dropzone--dropzone-target="anotherTarget fooTarget"',
             (string) $extension->appendStimulusTarget($dto, '@symfony/ux-dropzone/dropzone', 'anotherTarget fooTarget')
+        );
+    }
+
+    public function testAppendDifferentStimulusHelpers(): void
+    {
+        $extension = new StimulusTwigExtension(new StimulusHelper($this->twig));
+        $dto = $extension->renderStimulusController('first-controller');
+        $dto = $extension->appendStimulusTarget($dto, 'second-controller', 'anotherTarget');
+        $dto = $extension->appendStimulusTarget($dto, 'third-controller', 'foo');
+        $dto = $extension->appendStimulusAction($dto, 'first-controller', 'test');
+        $dto = $extension->appendStimulusController($dto, 'fourth-controller');
+        $dto = $extension->appendStimulusAction($dto, 'fourth-controller', 'onClick');
+
+        $this->assertSame(
+            'data-controller="first-controller fourth-controller" data-action="first-controller#test fourth-controller#onClick" data-second-controller-target="anotherTarget" data-third-controller-target="foo"',
+            (string) $dto
         );
     }
 }

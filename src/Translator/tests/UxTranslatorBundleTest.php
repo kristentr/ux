@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\Translator\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\Translator\Tests\Kernel\EmptyAppKernel;
@@ -24,10 +25,8 @@ class UxTranslatorBundleTest extends TestCase
         yield 'framework' => [new FrameworkAppKernel('test', true)];
     }
 
-    /**
-     * @dataProvider provideKernels
-     */
-    public function testBootKernel(Kernel $kernel)
+    #[DataProvider('provideKernels')]
+    public function testBootKernel(Kernel $kernel): void
     {
         $kernel->boot();
         $this->assertArrayHasKey('UxTranslatorBundle', $kernel->getBundles());

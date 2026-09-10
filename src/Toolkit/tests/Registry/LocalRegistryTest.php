@@ -17,7 +17,7 @@ use Symfony\UX\Toolkit\Registry\LocalRegistry;
 
 final class LocalRegistryTest extends KernelTestCase
 {
-    public function testCanGetKit()
+    public function testCanGetKit(): void
     {
         $localRegistry = new LocalRegistry(
             self::getContainer()->get('ux_toolkit.kit.kit_factory'),
@@ -28,5 +28,27 @@ final class LocalRegistryTest extends KernelTestCase
 
         $this->assertInstanceOf(Kit::class, $kit);
         $this->assertSame('Shadcn UI', $kit->manifest->name);
+    }
+
+    public function testExists(): void
+    {
+        $this->assertTrue(LocalRegistry::exists('shadcn'));
+        $this->assertFalse(LocalRegistry::exists('does-not-exist'));
+        // A traversal attempt is rejected by the name guard, never hitting the filesystem.
+        $this->assertFalse(LocalRegistry::exists('../../etc'));
+    }
+
+    public function testGetAvailableKits(): void
+    {
+        $localRegistry = new LocalRegistry(
+            self::getContainer()->get('ux_toolkit.kit.kit_factory'),
+            self::getContainer()->get('filesystem'),
+        );
+
+        $kits = $localRegistry->getAvailableKits();
+
+        $this->assertSame(LocalRegistry::getAvailableKitsName(), array_keys($kits));
+        $this->assertContainsOnlyInstancesOf(Kit::class, $kits);
+        $this->assertSame('Shadcn UI', $kits['shadcn']->manifest->name);
     }
 }

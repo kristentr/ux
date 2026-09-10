@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\Cropperjs\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpKernel\Kernel;
 use Symfony\UX\Cropperjs\Tests\Kernel\EmptyAppKernel;
@@ -31,10 +32,8 @@ class CropperjsBundleTest extends TestCase
         yield 'twig' => [new TwigAppKernel('test', true)];
     }
 
-    /**
-     * @dataProvider provideKernels
-     */
-    public function testBootKernel(Kernel $kernel)
+    #[DataProvider('provideKernels')]
+    public function testBootKernel(Kernel $kernel): void
     {
         $kernel->boot();
         $this->assertArrayHasKey('CropperjsBundle', $kernel->getBundles());

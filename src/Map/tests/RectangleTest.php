@@ -19,32 +19,30 @@ use Symfony\UX\Map\Rectangle;
 
 class RectangleTest extends TestCase
 {
-    public function testToArray()
+    public function testToArray(): void
     {
         $infoWindow = new InfoWindow('Hello');
 
         $southWest = new Point(1.0, 2.0);
         $northEast = new Point(3.0, 4.0);
 
-        $rectangle = new Rectangle($southWest, $northEast, null, $infoWindow, ['foo' => 'bar'], 'rect1');
+        $rectangle = new Rectangle($southWest, $northEast, $infoWindow, ['foo' => 'bar'], 'rect1');
 
         $array = $rectangle->toArray();
         self::assertSame([
             'southWest' => ['lat' => 1.0, 'lng' => 2.0],
             'northEast' => ['lat' => 3.0, 'lng' => 4.0],
-            'title' => null,
             'infoWindow' => $infoWindow->toArray(),
             'extra' => ['foo' => 'bar'],
             'id' => 'rect1',
         ], $array);
     }
 
-    public function testFromArray()
+    public function testFromArray(): void
     {
         $data = [
             'southWest' => ['lat' => 1.0, 'lng' => 2.0],
             'northEast' => ['lat' => 3.0, 'lng' => 4.0],
-            'title' => null,
             'infoWindow' => ['content' => 'Hello'],
             'extra' => ['foo' => 'bar'],
             'id' => 'rect1',
@@ -56,7 +54,6 @@ class RectangleTest extends TestCase
         self::assertSame([
             'southWest' => ['lat' => 1.0, 'lng' => 2.0],
             'northEast' => ['lat' => 3.0, 'lng' => 4.0],
-            'title' => null,
             'infoWindow' => [
                 'headerContent' => null,
                 'content' => 'Hello',
@@ -70,7 +67,7 @@ class RectangleTest extends TestCase
         ], $array);
     }
 
-    public function testFromArrayThrowsExceptionIfSouthWestMissing()
+    public function testFromArrayThrowsExceptionIfSouthWestMissing(): void
     {
         $this->expectException(InvalidArgumentException::class);
 
@@ -79,7 +76,7 @@ class RectangleTest extends TestCase
         ]);
     }
 
-    public function testFromArrayThrowsExceptionIfNorthEastMissing()
+    public function testFromArrayThrowsExceptionIfNorthEastMissing(): void
     {
         $this->expectException(InvalidArgumentException::class);
 

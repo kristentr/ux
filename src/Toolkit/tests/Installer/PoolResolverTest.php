@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 /*
  * This file is part of the Symfony package.
  *
@@ -29,7 +27,7 @@ final class PoolResolverTest extends TestCase
 {
     use TestHelperTrait;
 
-    public function testCanResolveDependencies()
+    public function testCanResolveDependencies(): void
     {
         $kitSynchronizer = new KitSynchronizer(new Filesystem(), new RecipeSynchronizer());
         $kit = self::createLocalKit('shadcn');
@@ -42,7 +40,7 @@ final class PoolResolverTest extends TestCase
         $this->assertEquals([
             'templates/components/Button.html.twig',
         ], array_keys($pool->getFiles()[$recipeButton->absolutePath]));
-        $this->assertCount(3, $pool->getPhpPackageDependencies());
+        $this->assertCount(4, $pool->getPhpPackageDependencies());
 
         $pool = $poolResolver->resolveForRecipe($kit, $recipeTable = $kit->getRecipe('table'));
 
@@ -56,10 +54,10 @@ final class PoolResolverTest extends TestCase
             'templates/components/Table/Header.html.twig',
             'templates/components/Table/Row.html.twig',
         ], array_keys($pool->getFiles()[$recipeTable->absolutePath]));
-        $this->assertCount(1, $pool->getPhpPackageDependencies());
+        $this->assertCount(3, $pool->getPhpPackageDependencies());
     }
 
-    public function testCanHandleCircularRecipeDependencies()
+    public function testCanHandleCircularRecipeDependencies(): void
     {
         $kitSynchronizer = new KitSynchronizer(new Filesystem(), new RecipeSynchronizer());
         $kit = self::createFixtureKit('with-circular-components-dependencies');
@@ -84,7 +82,7 @@ final class PoolResolverTest extends TestCase
         $this->assertCount(0, $pool->getPhpPackageDependencies());
     }
 
-    public function testCanHandleAllPossibleDependencies()
+    public function testCanHandleAllPossibleDependencies(): void
     {
         $kitSynchronizer = new KitSynchronizer(new Filesystem(), new RecipeSynchronizer());
         $kit = self::createFixtureKit('with-many-dependencies');
@@ -116,18 +114,21 @@ final class PoolResolverTest extends TestCase
         $this->assertCount(0, $pool->getFiles());
 
         $this->assertEquals([
+            'global/php-package' => new PhpPackageDependency('global/php-package', new ConstraintVersion('^4.0')),
             'twig/html-extra' => new PhpPackageDependency('twig/html-extra', new ConstraintVersion('^3.12.0')),
             'tales-from-a-dev/twig-tailwind-extra' => new PhpPackageDependency('tales-from-a-dev/twig-tailwind-extra', new ConstraintVersion('^1.0.0')),
             'another/php-package' => new PhpPackageDependency('another/php-package', new ConstraintVersion('^2.0')),
         ], $pool->getPhpPackageDependencies());
 
         $this->assertEquals([
+            'global-npm-package' => new NpmPackageDependency('global-npm-package', new ConstraintVersion('^3.0')),
             'tailwindcss' => new NpmPackageDependency('tailwindcss', new ConstraintVersion('^4.0.0')),
             '@tailwindplus/elements' => new NpmPackageDependency('@tailwindplus/elements', new ConstraintVersion('1')),
             'another-npm-package' => new NpmPackageDependency('another-npm-package', new ConstraintVersion('^1.0.0')),
         ], $pool->getNpmPackageDependencies());
 
         $this->assertEquals([
+            'global-importmap-package' => new ImportmapPackageDependency('global-importmap-package'),
             '@hotwired/stimulus' => new ImportmapPackageDependency('@hotwired/stimulus'),
             'another-importmap-package' => new ImportmapPackageDependency('another-importmap-package'),
         ], $pool->getImportmapPackageDependencies());

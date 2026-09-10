@@ -90,10 +90,6 @@ You can set the center and zoom of the map using the ``center()`` and ``zoom()``
 Min and max zooms
 ~~~~~~~~~~~~~~~~~
 
-.. versionadded:: 2.28
-
-    The ability to set min and max zooms was added in UX Map 2.28.
-
 You can set the minimum and maximum zoom levels of the map using the ``minZoom()`` and ``maxZoom()`` methods::
 
     use Symfony\UX\Map\Map;
@@ -152,10 +148,6 @@ You can add markers to a map using the ``addMarker()`` method::
 Add Marker icons
 ~~~~~~~~~~~~~~~~
 
-.. versionadded:: 2.24
-
-    ``Marker`` icon customization is available since UX Map 2.24.
-
 A ``Marker`` can be customized with an ``Icon`` instance, which can either be an UX Icon, an URL, or a SVG content::
 
         // It can be a UX Icon (requires `symfony/ux-icons` package)...
@@ -187,11 +179,7 @@ You can also add Polygons, which represents an area enclosed by a series of ``Po
         ),
     ));
 
-.. versionadded:: 2.26
-
-    `Polygon` with holes is available since UX Map 2.26.
-
-Since UX Map 2.26, you can create polygons with holes by using an array of ``array<Point>``::
+You can also create polygons with holes by using an array of ``array<Point>``::
 
     // Draw a polygon with a hole in it, on the France map
     $map->addPolygon(new Polygon(points: [
@@ -352,10 +340,6 @@ templates. The function accepts the same arguments as the ``Map`` class:
         }
     ) }}
 
-.. versionadded:: 2.31
-
-    `fitBoundsToMarkers` option for the twig function is available since UX Map 2.31.
-
 Twig Component ``<twig:ux:map />``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -385,10 +369,6 @@ The ``<twig:ux:map />`` component requires the `Twig Component`_ package.
 .. code-block:: terminal
 
     $ composer require symfony/ux-twig-component
-
-.. versionadded:: 2.31
-
-    `fitBoundsToMarkers` option for the twig component is available since UX Map 2.31.
 
 Interact with the map
 ~~~~~~~~~~~~~~~~~~~~~
@@ -601,12 +581,6 @@ abstraction limiting and need to configure low-level options directly.
 Fortunately, you can customize these low-level options through the UX Map
 events ``ux:map:*:before-create`` using the special ``bridgeOptions`` property:
 
-.. deprecated:: 2.27
-
-    The ``rawOptions`` property was deprecated in UX Map 2.27, and will be removed in 3.0.
-    Use ``bridgeOptions`` instead, which better reflect the purpose of these options (options that are
-    specific to the renderer bridge).
-
 .. code-block:: javascript
 
     // assets/controllers/mymap_controller.js
@@ -727,10 +701,6 @@ with a specific marker; for example, indicating the type of location it represen
 These additional data are defined and used exclusively by you; UX Map
 only forwards them to the Stimulus controller.
 
-.. versionadded:: 2.27
-
-    The ability to pass extra data to ``Map`` class was added in UX Map 2.27.
-
 To pass extra data from PHP to the Stimulus controller, you must use the ``extra``
 property available in ``Map``, ``Marker``, ``InfoWindow``, ``Polygon``, ``Polyline``,
 ``Circle`` and ``Rectangle``::
@@ -779,10 +749,6 @@ On the JavaScript side, you can access these extra data by listening to ``ux:map
 
 Usage with Live Components
 --------------------------
-
-.. versionadded:: 2.22
-
-    The ability to render and interact with a Map inside a Live Component was added in Map 2.22.
 
 To use a Map inside a Live Component, you need to use the ``ComponentWithMapTrait`` trait
 and implement the method ``instantiateMap`` to return a ``Map`` instance.
@@ -869,10 +835,6 @@ You can retrieve the map instance using the ``getMap()`` method, and change the 
 Advanced: Clusters
 ------------------
 
-.. versionadded:: 2.29
-
-    Clusters were added in UX Map 2.29.
-
 A cluster is a group of points that are close to each other on a map.
 
 Clustering reduces clutter and improves performance when displaying many points.
@@ -915,7 +877,7 @@ https://symfony.com/doc/current/contributing/code/bc.html
 .. _`the Symfony UX initiative`: https://ux.symfony.com/
 .. _`Google Maps`: https://github.com/symfony/ux-google-map
 .. _`Leaflet`: https://github.com/symfony/ux-leaflet-map
-.. _`Symfony UX Map Google Maps bridge docs`: https://github.com/symfony/ux/blob/2.x/src/Map/src/Bridge/Google/README.md
-.. _`Symfony UX Map Leaflet bridge docs`: https://github.com/symfony/ux/blob/2.x/src/Map/src/Bridge/Leaflet/README.md
+.. _`Symfony UX Map Google Maps bridge docs`: https://github.com/symfony/ux/blob/3.x/src/Map/src/Bridge/Google/README.md
+.. _`Symfony UX Map Leaflet bridge docs`: https://github.com/symfony/ux/blob/3.x/src/Map/src/Bridge/Leaflet/README.md
 .. _`Twig Component`: https://symfony.com/bundles/ux-twig-component/current/index.html
 .. _`Live Actions`: https://symfony.com/bundles/ux-live-component/current/index.html#actions

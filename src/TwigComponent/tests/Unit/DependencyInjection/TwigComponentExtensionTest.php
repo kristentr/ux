@@ -9,13 +9,15 @@
  * file that was distributed with this source code.
  */
 
-namespace Symfony\UX\TwigComponent\Test\DependencyInjection;
+namespace Symfony\UX\TwigComponent\Tests\Unit\DependencyInjection;
 
 use PHPUnit\Framework\TestCase;
-use Symfony\Bridge\PhpUnit\ExpectDeprecationTrait;
+use Symfony\Bundle\TwigBundle\DependencyInjection\Compiler\SafeClassPass;
 use Symfony\Component\DependencyInjection\ContainerBuilder;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBag;
+use Symfony\UX\TwigComponent\ComponentAttributes;
 use Symfony\UX\TwigComponent\DependencyInjection\TwigComponentExtension;
+use Symfony\UX\TwigComponent\Twig\TwigEnvironmentConfigurator;
 use Symfony\UX\TwigComponent\TwigComponentBundle;
 
 /**
@@ -23,9 +25,7 @@ use Symfony\UX\TwigComponent\TwigComponentBundle;
  */
 class TwigComponentExtensionTest extends TestCase
 {
-    use ExpectDeprecationTrait;
-
-    public function testDataCollectorWithDebugMode()
+    public function testDataCollectorWithDebugMode(): void
     {
         $container = $this->createContainer();
         $container->setParameter('kernel.debug', true);
@@ -40,7 +40,7 @@ class TwigComponentExtensionTest extends TestCase
         $this->assertTrue($container->getDefinition('ux.twig_component.data_collector')->getArgument(2));
     }
 
-    public function testDataCollectorWithCollectComponentsDisabled()
+    public function testDataCollectorWithCollectComponentsDisabled(): void
     {
         $container = $this->createContainer();
         $container->setParameter('kernel.debug', true);
@@ -58,7 +58,7 @@ class TwigComponentExtensionTest extends TestCase
         $this->assertFalse($container->getDefinition('ux.twig_component.data_collector')->getArgument(2));
     }
 
-    public function testDataCollectorNotLoadedInProductionByDefault()
+    public function testDataCollectorNotLoadedInProductionByDefault(): void
     {
         $container = $this->createContainer();
         $container->setParameter('kernel.debug', false);
@@ -72,7 +72,7 @@ class TwigComponentExtensionTest extends TestCase
         $this->assertFalse($container->hasDefinition('ux.twig_component.data_collector'));
     }
 
-    public function testDataCollectorWithDebugModeCanBeDisabled()
+    public function testDataCollectorWithDebugModeCanBeDisabled(): void
     {
         $container = $this->createContainer();
         $container->setParameter('kernel.debug', true);
@@ -87,24 +87,43 @@ class TwigComponentExtensionTest extends TestCase
         $this->assertFalse($container->hasDefinition('ux.twig_component.data_collector'));
     }
 
-    /**
-     * @group legacy
-     */
-    public function testSettingControllerJsonKeyTriggerDeprecation()
+    public function testSafeClassPassIntegration(): void
     {
+        if (!class_exists(SafeClassPass::class)) {
+            $this->markTestSkipped('Requires symfony/twig-bundle >= 8.1 with SafeClassPass support');
+        }
+
         $container = $this->createContainer();
-        $container->setParameter('kernel.debug', true);
         $container->registerExtension(new TwigComponentExtension());
         $container->loadFromExtension('twig_component', [
             'defaults' => [],
             'anonymous_template_directory' => 'components/',
-            'profiler' => false,
-            'controllers_json' => null,
         ]);
-
-        $this->expectDeprecation('Since symfony/ux-twig-component 2.18: The "twig_component.controllers_json" config option is deprecated, and will be removed in 3.0.');
-
         $this->compileContainer($container);
+
+        $this->assertFalse($container->hasDefinition('ux.twig_component.twig.environment_configurator'));
+        $this->assertTrue($container->hasDefinition(ComponentAttributes::class));
+        $def = $container->getDefinition(ComponentAttributes::class);
+        $this->assertTrue($def->hasTag('twig.safe_class'));
+        $this->assertSame([['strategy' => 'html']], $def->getTag('twig.safe_class'));
+    }
+
+    public function testFallbackToEnvironmentConfiguratorWithoutSafeClassPass(): void
+    {
+        if (class_exists(SafeClassPass::class)) {
+            $this->markTestSkipped('Only relevant with symfony/twig-bundle < 8.1 without SafeClassPass support');
+        }
+
+        $container = $this->createContainer();
+        $container->registerExtension(new TwigComponentExtension());
+        $container->loadFromExtension('twig_component', [
+            'defaults' => [],
+            'anonymous_template_directory' => 'components/',
+        ]);
+        $this->compileContainer($container);
+
+        $this->assertTrue($container->hasDefinition('ux.twig_component.twig.environment_configurator'));
+        $this->assertSame(TwigEnvironmentConfigurator::class, $container->getDefinition('ux.twig_component.twig.environment_configurator')->getClass());
     }
 
     private function createContainer()
@@ -124,7 +143,7 @@ class TwigComponentExtensionTest extends TestCase
         return $container;
     }
 
-    private function compileContainer(ContainerBuilder $container)
+    private function compileContainer(ContainerBuilder $container): void
     {
         $container->getCompilerPassConfig()->setOptimizationPasses([]);
         $container->getCompilerPassConfig()->setRemovingPasses([]);

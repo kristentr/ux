@@ -1,0 +1,9 @@
+{# @block content The pagination structure, typically a `Pagination:Content`. #}
+<nav
+    role="navigation"
+    {{ attributes.defaults({
+        class: 'flex items-center space-x-4'|tailwind_classes,
+    }) }}
+>
+    {%- block content %}{% endblock -%}
+</nav>

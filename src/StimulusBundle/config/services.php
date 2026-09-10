@@ -15,8 +15,6 @@ use Symfony\UX\StimulusBundle\AssetMapper\ControllersMapGenerator;
 use Symfony\UX\StimulusBundle\AssetMapper\StimulusLoaderJavaScriptCompiler;
 use Symfony\UX\StimulusBundle\Helper\StimulusHelper;
 use Symfony\UX\StimulusBundle\Twig\StimulusTwigExtension;
-use Symfony\UX\StimulusBundle\Twig\UxControllersTwigExtension;
-use Symfony\UX\StimulusBundle\Twig\UxControllersTwigRuntime;
 use Symfony\UX\StimulusBundle\Ux\UxPackageReader;
 use Twig\Environment;
 
@@ -30,6 +28,8 @@ return static function (ContainerConfigurator $container): void {
             ->args([
                 service(Environment::class)->nullOnInvalid(),
             ])
+
+        ->alias(StimulusHelper::class, 'stimulus.helper')
 
         ->set('stimulus.twig_extension', StimulusTwigExtension::class)
             ->args([
@@ -45,17 +45,6 @@ return static function (ContainerConfigurator $container): void {
             ])
 
         // symfony/asset-mapper services
-        ->set('stimulus.ux_controllers_twig_extension', UxControllersTwigExtension::class)
-            ->tag('twig.extension')
-
-        ->set('stimulus.ux_controllers_twig_runtime', UxControllersTwigRuntime::class)
-            ->args([
-                service('stimulus.asset_mapper.controllers_map_generator'),
-                service('asset_mapper'),
-                service('stimulus.asset_mapper.ux_package_reader'),
-                param('kernel.project_dir'),
-            ])
-            ->tag('twig.runtime')
 
         ->set('stimulus.asset_mapper.controllers_map_generator', ControllersMapGenerator::class)
             ->args([

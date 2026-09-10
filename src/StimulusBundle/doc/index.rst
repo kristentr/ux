@@ -15,15 +15,15 @@ Installation
 ------------
 
 First, if you don't have one yet, choose and install an asset handling system;
-both work great with StimulusBundle:
+they all work great with StimulusBundle:
 
 * `AssetMapper`_: PHP-based system for handling assets
 
-or
+* `Webpack Encore`_: Node-based packaging system built on Webpack
 
-* `Webpack Encore`_ Node-based packaging system
+* `Reprise`_: Node-based integration for Vite and Rsbuild (experimental)
 
-See `Encore vs AssetMapper`_ to learn which is best for your project.
+See `Reprise vs Encore vs AssetMapper`_ to learn which is best for your project.
 
 Next, install the bundle:
 
@@ -342,6 +342,84 @@ You can also retrieve the generated attributes as an array, which can be helpful
 
     {{ form_row(form.password, { attr: stimulus_target('hello-controller', 'myTarget').toArray() }) }}
 
+Chaining Different Helpers
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``stimulus_controller``, ``stimulus_action`` and ``stimulus_target``
+filters can be mixed freely to render all the attributes of an element at
+once, whichever function the chain started with:
+
+.. code-block:: html+twig
+
+    <div {{ stimulus_controller('first-controller')
+        |stimulus_target('second-controller', 'anotherTarget')
+        |stimulus_target('third-controller', 'foo')
+        |stimulus_action('first-controller', 'test')
+        |stimulus_controller('fourth-controller')
+        |stimulus_action('fourth-controller', 'onClick') }}
+    >
+        Hello
+    </div>
+
+    <!-- would render -->
+    <div data-controller="first-controller fourth-controller"
+        data-action="first-controller#test fourth-controller#onClick"
+        data-second-controller-target="anotherTarget"
+        data-third-controller-target="foo"
+    >
+        Hello
+    </div>
+
+Stimulus Attributes from PHP
+----------------------------
+
+The same attributes are available from PHP through the ``StimulusHelper``
+service, which you can autowire. Reach for it when the element you want to
+decorate is not written in a template, a form field for instance::
+
+    // src/Form/EventType.php
+    namespace App\Form;
+
+    use Symfony\Component\Form\AbstractType;
+    use Symfony\Component\Form\Extension\Core\Type\CountryType;
+    use Symfony\Component\Form\FormBuilderInterface;
+    use Symfony\UX\StimulusBundle\Helper\StimulusHelper;
+
+    class EventType extends AbstractType
+    {
+        public function __construct(private StimulusHelper $stimulusHelper)
+        {
+        }
+
+        public function buildForm(FormBuilderInterface $builder, array $options): void
+        {
+            $attributes = $this->stimulusHelper->createStimulusAttributes();
+            $attributes->addController('country-picker', ['locale' => 'fr']);
+            $attributes->addTarget('country-picker', 'select');
+            $attributes->addAction('country-picker', 'refresh', 'change');
+
+            $builder->add('country', CountryType::class, [
+                'attr' => $attributes->toArray(),
+            ]);
+        }
+    }
+
+The field then renders with the attributes the Twig helpers would have
+produced:
+
+.. code-block:: html
+
+    <select
+        data-controller="country-picker"
+        data-action="change->country-picker#refresh"
+        data-country-picker-target="select"
+        data-country-picker-locale-value="fr"
+    >
+
+Cast the object to a string when you need the rendered attributes rather than
+an array, and use ``addAttribute()`` to carry along an attribute that is not a
+Stimulus one.
+
 .. _configuration:
 
 Configuration
@@ -368,12 +446,12 @@ When you install this bundle, its Flex recipe should handle updating all the fil
 needed. If you're not using Flex or want to double-check the changes, check out
 the `StimulusBundle Flex recipe`_. Here's a summary of what's inside:
 
-* ``assets/bootstrap.js`` starts the Stimulus application and loads your
+* ``assets/stimulus_bootstrap.js`` starts the Stimulus application and loads your
   controllers. It's imported by ``assets/app.js`` and its exact content
   depends on whether you have Webpack Encore or AssetMapper installed
   (see below).
 
-* ``assets/app.js`` is *updated* to import ``assets/bootstrap.js``
+* ``assets/app.js`` is *updated* to import ``assets/stimulus_bootstrap.js``
 
 * ``assets/controllers.json`` This file starts (mostly) empty and is automatically
   updated as your install UX packages that provide Stimulus controllers.
@@ -401,11 +479,11 @@ file::
         ],
     ];
 
-The recipe will update your ``assets/bootstrap.js`` file to look like this:
+The recipe will update your ``assets/stimulus_bootstrap.js`` file to look like this:
 
 .. code-block:: javascript
 
-    // assets/bootstrap.js
+    // assets/stimulus_bootstrap.js
     import { startStimulusApp } from '@symfony/stimulus-bundle';
 
     const app = startStimulusApp();
@@ -416,10 +494,6 @@ will import all your custom controllers as well as those from ``controllers.json
 It will also dynamically enable "debug" mode in Stimulus when your application
 is running in debug mode.
 
-.. tip::
-
-    For AssetMapper 6.3 only, you also need a ``{{ ux_controller_link_tags() }}``
-    in ``base.html.twig``. This is not needed in AssetMapper 6.4+.
 
 With WebpackEncoreBundle
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -432,11 +506,11 @@ file to include this line:
     // webpack.config.js
     .enableStimulusBridge('./assets/controllers.json')
 
-The ``assets/bootstrap.js`` file will be updated to look like this:
+The ``assets/stimulus_bootstrap.js`` file will be updated to look like this:
 
 .. code-block:: javascript
 
-    // assets/bootstrap.js
+    // assets/stimulus_bootstrap.js
     import { startStimulusApp } from '@symfony/stimulus-bridge';
 
     // Registers Stimulus controllers from controllers.json and in the controllers/ directory
@@ -446,8 +520,45 @@ The ``assets/bootstrap.js`` file will be updated to look like this:
         /\.[jt]sx?$/
     ));
 
-And 2 new packages - ``@hotwired/stimulus`` and ``@symfony/stimulus-bridge`` - will
-be added to your ``package.json`` file.
+The ``@hotwired/stimulus`` package will be added to your ``package.json`` file.
+The Webpack Encore integration also relies on `@symfony/stimulus-bridge`_, which is specific to Encore,
+so install it yourself:
+
+.. code-block:: terminal
+
+    $ npm install --save-dev @symfony/stimulus-bridge
+
+With Reprise
+~~~~~~~~~~~~
+
+If you're using `Reprise`_, you must enable Stimulus by pointing the Reprise plugin at your ``controllers.json`` file:
+
+.. code-block:: javascript
+
+    // vite.config.js (or rsbuild.config.js)
+    import Symfony from '@symfony/reprise/vite';
+
+    export default defineConfig({
+        plugins: [
+            Symfony({
+                stimulus: './assets/controllers.json',
+            }),
+        ],
+    });
+
+The ``assets/stimulus_bootstrap.js`` file will be updated to look like this:
+
+.. code-block:: javascript
+
+    // assets/stimulus_bootstrap.js
+    import { startStimulusApp } from '@symfony/reprise/stimulus';
+
+    const app = startStimulusApp();
+
+The ``@symfony/reprise/stimulus`` helper starts the application and registers all your
+custom controllers along with those from ``controllers.json``, eager or lazy, the same
+way the AssetMapper loader does. The Stimulus runtime ships with the ``@symfony/reprise``
+package, so ``@hotwired/stimulus`` is the only extra package you need to install.
 
 How are the Stimulus Controllers Loaded?
 ----------------------------------------
@@ -486,15 +597,15 @@ to add a new Stimulus controller to your app. For example:
         "entrypoints": []
     }
 
-Finally, your ``assets/bootstrap.js`` file will automatically register:
+Finally, your ``assets/stimulus_bootstrap.js`` file will automatically register:
 
 * All files in ``assets/controllers/`` as Stimulus controllers;
 * And all controllers described in ``assets/controllers.json`` as Stimulus controllers.
 
 .. note::
 
-    If you're using WebpackEncore, the ``bootstrap.js`` file works in partnership
-    with `@symfony/stimulus-bridge`_. With AssetMapper, the ``bootstrap.js`` file
+    If you're using WebpackEncore, the ``stimulus_bootstrap.js`` file works in partnership
+    with `@symfony/stimulus-bridge`_. With AssetMapper, the ``stimulus_bootstrap.js`` file
     works directly with this bundle: a ``@symfony/stimulus-bundle`` entry is added
     to your ``importmap.php`` file via Flex, which points to a file that is dynamically
     built to find and load your controllers (see :ref:`Configuration <configuration>`).
@@ -513,13 +624,118 @@ it will normalize it:
     <!-- will render as: -->
     <div data-controller="symfony--ux-chartjs--chart">
 
-.. _Encore vs AssetMapper: https://symfony.com/doc/current/frontend.html
+
+Loading Different Controllers per Part of Your App
+--------------------------------------------------
+
+An application can have distinct areas, for example a public site and an
+admin back office. By default, every registered controller loads on every
+page, so eagerly loaded controllers from one area ship to the other.
+
+.. note::
+
+    Webpack Encore and Reprise both support this. AssetMapper does not:
+    ``startStimulusApp()`` in ``@symfony/stimulus-bundle`` takes no arguments
+    and always reads the full ``controllers.json``.
+
+Scoping Controllers with Reprise
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``startStimulusApp()`` from ``@symfony/reprise/stimulus`` takes no arguments,
+like the AssetMapper one. What it reads is generated by the Reprise plugin,
+and that generation is configurable, so each build can be given its own set
+of controllers.
+
+If a single config defines several entry points, they all share the same
+controller set, because there is only one plugin instance. To scope
+controllers to a given area of your application, give that area its own
+build config and point the plugin at its own controllers directory. For
+example, an admin area could use a dedicated config like this:
+
+.. code-block:: javascript
+
+    // vite.config.admin.ts  -- run with `vite build --config vite.config.admin.ts`
+    import { defineConfig } from 'vite'
+    import Symfony from '@symfony/reprise/vite'
+
+    export default defineConfig({
+      input: {
+        admin: './assets/admin.js',
+      },
+      plugins: [
+        Symfony({
+          outputPath: 'public/admin-build',
+          publicPath: '/admin-build/',
+          stimulus: {
+            controllersJson: 'assets/admin/controllers.json',
+            controllersDir: 'assets/admin/controllers',
+          },
+        }),
+      ],
+    })
+
+This entry point then starts the application the usual way:
+
+.. code-block:: javascript
+
+    // assets/admin.js
+    import { startStimulusApp } from '@symfony/reprise/stimulus'
+
+    const app = startStimulusApp()
+
+Register this build on the PHP side under ``reprise.builds`` so the Twig tag
+functions can address it with a ``build`` argument.
+
+See the `Reprise Stimulus documentation`_ for what else the returned application
+lets you do, such as registering controllers that are not declared in
+``controllers.json``.
+
+Scoping Controllers with Webpack Encore
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``startStimulusApp()`` from `@symfony/stimulus-bridge`_ accepts a Webpack
+context, so you can point each entry at its own controller directory. This
+``assets/admin.js`` file loads only the controllers under
+``controllers/admin``:
+
+.. code-block:: javascript
+
+    import { startStimulusApp } from '@symfony/stimulus-bridge';
+
+    export const app = startStimulusApp(require.context(
+        '@symfony/stimulus-bridge/lazy-controller-loader!./controllers/admin',
+        true,
+        /\.[jt]sx?$/
+    ));
+
+If you keep the controllers shared between areas in their own directory, you
+can load several contexts into the same application:
+
+.. code-block:: javascript
+
+    import { startStimulusApp } from '@symfony/stimulus-bridge';
+    import { definitionsFromContext } from '@hotwired/stimulus-webpack-helpers';
+
+    const app = startStimulusApp();
+
+    app.load(definitionsFromContext(require.context('./controllers/common', true)));
+    app.load(definitionsFromContext(require.context('./controllers/admin', true)));
+
+This second form drops the lazy controller loader, so add it back to the
+context path if you rely on lazy loading.
+
+If you need this with AssetMapper, follow the discussion in issue #2321 in
+the ``symfony/ux`` repository.
+
+.. _Reprise vs Encore vs AssetMapper: https://symfony.com/doc/current/frontend.html
 .. _Symfony Flex: https://symfony.com/doc/current/setup/flex.html
 .. _Stimulus Documentation: https://stimulus.hotwired.dev/
 .. _`@symfony/stimulus-bridge`: https://github.com/symfony/stimulus-bridge
 .. _`Stimulus`: https://stimulus.hotwired.dev/
-.. _`Webpack Encore`: https://symfony.com/doc/current/frontend.html
+.. _`Webpack Encore`: https://symfony.com/doc/current/frontend/encore/index.html
 .. _`AssetMapper`: https://symfony.com/doc/current/frontend/asset_mapper.html
+.. _`Reprise`: https://github.com/symfony/reprise
+.. _`Reprise Stimulus documentation`: https://symfony.com/bundles/reprise/current/index.html#symfony-ux-stimulus-controllers
 .. _`Stimulus Controllers & Values`: https://stimulus.hotwired.dev/reference/values
 .. _`CSS Classes`: https://stimulus.hotwired.dev/reference/css-classes
 .. _`Outlets`: https://stimulus.hotwired.dev/reference/outlets

@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- Upgrade `@googlemaps/js-api-loader` JavaScript package from `^1.16.6` to `^2.0.0`:
+    - If you use Symfony AssetMapper without Symfony Flex, run `bin/console importmap:require @googlemaps/js-api-loader@^2.0`
+    - Options configurable through `UX_MAP_DSN` query params have changed:
+        - Option `version` has been renamed to `v`
+        - Options `authReferrerPolicy`, `mapIds`, `channel`, `solutionChannel` have been added
+        - Options `ìd`, `nonce`, `retries`, `url` have been removed
+
+## 2.35
+
+- Allow Symfony UX 3.x packages
+
 ## 2.31
 
 - Display a warning when trying to define `bridgeOptions.content` for a `Marker` that already has an `Icon`

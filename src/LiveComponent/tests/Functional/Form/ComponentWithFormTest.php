@@ -14,6 +14,7 @@ namespace Symfony\UX\LiveComponent\Tests\Functional\Form;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\Form\FormFactoryInterface;
+use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\UX\LiveComponent\Tests\Fixtures\Component\FormWithCollectionTypeComponent;
 use Symfony\UX\LiveComponent\Tests\Fixtures\Entity\User;
 use Symfony\UX\LiveComponent\Tests\Fixtures\Factory\CategoryFixtureEntityFactory;
@@ -36,7 +37,7 @@ class ComponentWithFormTest extends KernelTestCase
     use LiveComponentTestHelper;
     use ResetDatabase;
 
-    public function testFormValuesRebuildAfterFormChanges()
+    public function testFormValuesRebuildAfterFormChanges(): void
     {
         $browser = $this->browser();
         $crawler = $browser
@@ -117,7 +118,7 @@ class ComponentWithFormTest extends KernelTestCase
         ;
     }
 
-    public function testFormRemembersValidationFromInitialForm()
+    public function testFormRemembersValidationFromInitialForm(): void
     {
         /** @var FormFactoryInterface $formFactory */
         $formFactory = self::getContainer()->get('form.factory');
@@ -160,7 +161,7 @@ class ComponentWithFormTest extends KernelTestCase
         ;
     }
 
-    public function testHandleCheckboxChanges()
+    public function testHandleCheckboxChanges(): void
     {
         $category = CategoryFixtureEntityFactory::createMany(5);
         $id = $category[0]->getId();
@@ -293,7 +294,7 @@ class ComponentWithFormTest extends KernelTestCase
         ;
     }
 
-    public function testLiveCollectionTypeAddButtonsByDefault()
+    public function testLiveCollectionTypeAddButtonsByDefault(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('form_with_live_collection_type'))->getProps();
 
@@ -310,7 +311,7 @@ class ComponentWithFormTest extends KernelTestCase
         ;
     }
 
-    public function testResetForm()
+    public function testResetForm(): void
     {
         CategoryFixtureEntityFactory::createMany(5);
         $mounted = $this->mountComponent('form_with_many_different_fields_type');
@@ -363,7 +364,7 @@ class ComponentWithFormTest extends KernelTestCase
         ;
     }
 
-    public function testLiveCollectionTypeFieldsAddedAndRemoved()
+    public function testLiveCollectionTypeFieldsAddedAndRemoved(): void
     {
         $dehydratedProps = $this->dehydrateComponent($this->mountComponent('form_with_live_collection_type'))->getProps();
         $updatedProps = [];
@@ -439,7 +440,7 @@ class ComponentWithFormTest extends KernelTestCase
         ;
     }
 
-    public function testDataModelAttributeAutomaticallyAdded()
+    public function testDataModelAttributeAutomaticallyAdded(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('form_with_collection_type'))->getProps();
 
@@ -455,7 +456,7 @@ class ComponentWithFormTest extends KernelTestCase
         ;
     }
 
-    public function testFormWithLivePropContainingAnEntityImplementingAnInterface()
+    public function testFormWithLivePropContainingAnEntityImplementingAnInterface(): void
     {
         $user = persist(User::class, ['username' => 'Fabien']);
         self::assertInstanceOf(User::class, $user);
@@ -487,5 +488,41 @@ class ComponentWithFormTest extends KernelTestCase
         refresh($user);
         self::assertEquals(1, $user->id);
         self::assertEquals('Nicolas', $user->username);
+    }
+
+    public function testSubmitFormExceptionMessageContainsFieldPathsAndMessages(): void
+    {
+        $mounted = $this->mountComponent('form_with_collection_type');
+        $dehydratedProps = $this->dehydrateComponent($mounted)->getProps();
+
+        $exception = null;
+
+        try {
+            $this->browser()
+                ->throwExceptions()
+                ->post('/_components/form_with_collection_type/save', [
+                    'body' => [
+                        'data' => json_encode([
+                            'props' => $dehydratedProps,
+                            'updated' => [
+                                'blog_post_form.title' => '',
+                                'blog_post_form.content' => 'too short',
+                                'blog_post_form.comments' => [['content' => '']],
+                            ],
+                        ]),
+                    ],
+                ])
+            ;
+        } catch (UnprocessableEntityHttpException $e) {
+            $exception = $e;
+        }
+
+        $this->assertNotNull($exception);
+        $this->assertStringContainsString('title', $exception->getMessage());
+        $this->assertStringContainsString('content', $exception->getMessage());
+        $this->assertStringContainsString('The title field should not be blank', $exception->getMessage());
+        $this->assertStringContainsString('The content field is too short', $exception->getMessage());
+        $this->assertStringContainsString('blog_post_form.comments.0.content', $exception->getMessage());
+        $this->assertStringContainsString('The comment content field should not be blank', $exception->getMessage());
     }
 }

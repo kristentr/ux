@@ -2,12 +2,17 @@
     "$schema": "../../../schema-kit-recipe-v1.json",
     "type": "component",
     "name": "Tabs",
-    "description": "A set of layered sections of content known as tab panels that are displayed one at a time.",
+    "version-added": "2.33",
     "copy-files": {
         "assets/": "assets/",
         "templates/": "templates/"
     },
     "dependencies": {
-        "composer": ["twig/extra-bundle", "twig/html-extra:^3.12.0", "tales-from-a-dev/twig-tailwind-extra:^1.0.0"]
+        "composer": [
+            "twig/extra-bundle",
+            "twig/html-extra:^3.24.0",
+            "tales-from-a-dev/twig-tailwind-extra:^1.3.0",
+            "symfony/ux-twig-component:^3.5"
+        ]
     }
 }

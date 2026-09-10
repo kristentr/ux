@@ -1,0 +1,16 @@
+{# @prop open boolean Whether the modal is open on initial render. #}
+{# @prop id string Unique identifier used to generate internal Modal IDs. #}
+{# @block content The modal structure, typically includes `Modal:Trigger` and `Modal:Content`. #}
+{%- props open = false, id -%}
+
+{%- set _modal_id = 'modal-' ~ id -%}
+{%- set _modal_title_id = _modal_id ~ '-title' -%}
+<div
+    data-flowbite-modal-open-value="{{ open ? 'true' : 'false' }}"
+    aria-labelledby="{{ _modal_title_id }}"
+    {{ attributes.defaults({
+        'data-controller': 'flowbite-modal',
+    }) }}
+>
+    {% block content %}{% endblock %}
+</div>

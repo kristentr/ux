@@ -16,7 +16,7 @@ use Symfony\UX\Toolkit\Kit\KitFactory;
 
 final class KitFactoryTest extends KernelTestCase
 {
-    public function testShouldFailIfPathIsNotAbsolute()
+    public function testShouldFailIfPathIsNotAbsolute(): void
     {
         $kitFactory = $this->createKitFactory();
 
@@ -26,7 +26,7 @@ final class KitFactoryTest extends KernelTestCase
         $kitFactory->createKitFromAbsolutePath('shadcn');
     }
 
-    public function testShouldFailIfKitDoesNotExist()
+    public function testShouldFailIfKitDoesNotExist(): void
     {
         $kitFactory = $this->createKitFactory();
 
@@ -36,7 +36,7 @@ final class KitFactoryTest extends KernelTestCase
         $kitFactory->createKitFromAbsolutePath(__DIR__.'/../../kits/does-not-exist');
     }
 
-    public function testCanCreateShadcnKit()
+    public function testCanCreateShadcnKit(): void
     {
         $kit = $this->createKitFactory()->createKitFromAbsolutePath(__DIR__.'/../../kits/shadcn');
 
@@ -47,6 +47,23 @@ final class KitFactoryTest extends KernelTestCase
             $this->assertNotEmpty($recipe->absolutePath);
             $this->assertNotEmpty($recipe->manifest->name);
             $this->assertNotEmpty(iterator_to_array($recipe->getFiles()));
+        }
+    }
+
+    public function testShouldRejectKitWithRecipeEscapingItsDirectory(): void
+    {
+        // A malicious recipe whose "copy-files" tries to write outside the recipe directory
+        // must be rejected when the kit (and its recipes) are loaded, before any file is touched.
+        $pwnedPath = '/tmp/PWNED';
+        $alreadyExisted = file_exists($pwnedPath);
+
+        try {
+            $this->expectException(\RuntimeException::class);
+            $this->expectExceptionMessageMatches('/must not escape its target directory\./');
+
+            $this->createKitFactory()->createKitFromAbsolutePath(__DIR__.'/../Fixtures/kits/malicious');
+        } finally {
+            $this->assertSame($alreadyExisted, file_exists($pwnedPath), 'No file should have been written outside the recipe directory.');
         }
     }
 

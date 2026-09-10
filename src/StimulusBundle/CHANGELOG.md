@@ -1,5 +1,21 @@
 # CHANGELOG
 
+## 3.5.0
+
+- Alias the `StimulusHelper` service to its class name so it can be autowired
+
+## 3.3.0
+
+- Detect the `stimulusFetch: 'lazy'` directive inside preserved comments (`/*! ... */`)
+- Add support for the Symfony Reprise asset integration (Vite and Rsbuild)
+- Remove `@symfony/stimulus-bridge` from the npm peer dependencies; it is specific to Webpack Encore and must be installed manually there
+
+## 3.0.0
+
+- Minimum required Symfony version is now 7.4
+- Minimum required PHP version is now 8.4
+- Remove Twig function `ux_controller_link_tags()`, which requires Symfony AssetMapper >=6.4
+
 ## 2.33
 
 - Change AssetMapper `excluded_patterns` from `**/controllers.json` to `*/controllers.json`

@@ -13,7 +13,9 @@ namespace Symfony\UX\LiveComponent\Tests\Functional\Controller;
 
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\DomCrawler\Crawler;
+use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\UX\LiveComponent\Controller\BatchActionController;
 use Symfony\UX\LiveComponent\Tests\LiveComponentTestHelper;
 use Zenstruck\Browser\KernelBrowser;
 use Zenstruck\Browser\Test\HasBrowser;
@@ -26,7 +28,7 @@ final class BatchActionControllerTest extends KernelTestCase
     use HasBrowser;
     use LiveComponentTestHelper;
 
-    public function testCanBatchActions()
+    public function testCanBatchActions(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('with_actions'));
 
@@ -81,7 +83,7 @@ final class BatchActionControllerTest extends KernelTestCase
         ;
     }
 
-    public function testCanBatchActionsWithAlternateRoute()
+    public function testCanBatchActionsWithAlternateRoute(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('alternate_route'));
 
@@ -119,7 +121,7 @@ final class BatchActionControllerTest extends KernelTestCase
         ;
     }
 
-    public function testRedirect()
+    public function testRedirect(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('with_actions'));
 
@@ -155,7 +157,7 @@ final class BatchActionControllerTest extends KernelTestCase
         ;
     }
 
-    public function testRedirectWithAcceptHeader()
+    public function testRedirectWithAcceptHeader(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('with_actions'));
 
@@ -186,6 +188,7 @@ final class BatchActionControllerTest extends KernelTestCase
                     ],
                     'headers' => [
                         'Accept' => ['application/vnd.live-component+html'],
+                        'X-Requested-With' => ['XMLHttpRequest'],
                     ],
                 ]);
             })
@@ -194,7 +197,67 @@ final class BatchActionControllerTest extends KernelTestCase
         ;
     }
 
-    public function testException()
+    public function testDownloadDoesNotShortCircuitBatch(): void
+    {
+        // unlike a redirect, a download no longer ends the batch: it rides along with the
+        // final render, so the actions queued after it still run
+        $dehydrated = $this->dehydrateComponent($this->mountComponent('download_file'));
+
+        $this->browser()
+            ->throwExceptions()
+            ->post('/_components/download_file/_batch', [
+                'body' => [
+                    'data' => json_encode([
+                        'props' => $dehydrated->getProps(),
+                        'actions' => [
+                            ['name' => 'download'],
+                            ['name' => 'noDownload'],
+                        ],
+                    ]),
+                ],
+            ])
+            ->assertStatus(200)
+            ->assertSeeIn('#count', '2')
+            ->use(static function (KernelBrowser $browser) {
+                $headers = $browser->client()->getResponse()->headers;
+                $body = $browser->client()->getInternalResponse()->getContent();
+
+                self::assertSame('foo.json', rawurldecode($headers->get('X-Live-Download-Filename')));
+                self::assertSame(
+                    ['foo' => 'bar'],
+                    json_decode(substr($body, (int) $headers->get('X-Live-Html-Length')), true)
+                );
+            })
+        ;
+    }
+
+    public function testLastDownloadWinsWithinABatch(): void
+    {
+        $dehydrated = $this->dehydrateComponent($this->mountComponent('download_file'));
+
+        $this->browser()
+            ->throwExceptions()
+            ->post('/_components/download_file/_batch', [
+                'body' => [
+                    'data' => json_encode([
+                        'props' => $dehydrated->getProps(),
+                        'actions' => [
+                            ['name' => 'download'],
+                            ['name' => 'downloadEmpty'],
+                        ],
+                    ]),
+                ],
+            ])
+            ->assertStatus(200)
+            ->use(static function (KernelBrowser $browser) {
+                $headers = $browser->client()->getResponse()->headers;
+
+                self::assertSame('empty.txt', rawurldecode($headers->get('X-Live-Download-Filename')));
+            })
+        ;
+    }
+
+    public function testException(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('with_actions'));
 
@@ -228,7 +291,7 @@ final class BatchActionControllerTest extends KernelTestCase
         ;
     }
 
-    public function testCannotBatchWithNonLiveAction()
+    public function testCannotBatchWithNonLiveAction(): void
     {
         $dehydrated = $this->dehydrateComponent($this->mountComponent('with_actions'));
 
@@ -255,6 +318,76 @@ final class BatchActionControllerTest extends KernelTestCase
                                 ['name' => 'nonLive'],
                                 ['name' => 'add', 'args' => ['what' => 'fourth']],
                             ],
+                        ]),
+                    ],
+                ]);
+            })
+        ;
+    }
+
+    public function testAcceptsBatchAtMaxActions(): void
+    {
+        $dehydrated = $this->dehydrateComponent($this->mountComponent('with_actions'));
+
+        $this->browser()
+            ->throwExceptions()
+            ->post('/_components/with_actions', [
+                'body' => [
+                    'data' => json_encode([
+                        'props' => $dehydrated->getProps(),
+                    ]),
+                ],
+            ])
+            ->assertSuccessful()
+            ->use(static function (Crawler $crawler, KernelBrowser $browser) {
+                $rootElement = $crawler->filter('ul')->first();
+                $liveProps = json_decode($rootElement->attr('data-live-props-value'), true);
+
+                $actions = [];
+                for ($i = 0; $i < BatchActionController::MAX_ACTIONS_PER_BATCH; ++$i) {
+                    $actions[] = ['name' => 'add', 'args' => ['what' => "item-$i"]];
+                }
+
+                $browser->post('/_components/with_actions/_batch', [
+                    'body' => [
+                        'data' => json_encode([
+                            'props' => $liveProps,
+                            'actions' => $actions,
+                        ]),
+                    ],
+                ]);
+            })
+            ->assertSuccessful()
+            ->assertSee('item-0')
+            ->assertSee('item-49')
+        ;
+    }
+
+    public function testRejectsBatchAboveMaxActions(): void
+    {
+        $dehydrated = $this->dehydrateComponent($this->mountComponent('with_actions'));
+
+        $this->browser()
+            ->post('/_components/with_actions', [
+                'body' => [
+                    'data' => json_encode([
+                        'props' => $dehydrated->getProps(),
+                    ]),
+                ],
+            ])
+            ->assertSuccessful()
+            ->expectException(BadRequestHttpException::class, 'Too many actions in batch.')
+            ->use(static function (Crawler $crawler, KernelBrowser $browser) {
+                $rootElement = $crawler->filter('ul')->first();
+                $liveProps = json_decode($rootElement->attr('data-live-props-value'), true);
+
+                $actions = array_fill(0, BatchActionController::MAX_ACTIONS_PER_BATCH + 1, ['name' => 'add', 'args' => ['what' => 'x']]);
+
+                $browser->post('/_components/with_actions/_batch', [
+                    'body' => [
+                        'data' => json_encode([
+                            'props' => $liveProps,
+                            'actions' => $actions,
                         ]),
                     ],
                 ]);

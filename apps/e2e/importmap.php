@@ -61,7 +61,7 @@ return [
         'type' => 'css',
     ],
     '@googlemaps/js-api-loader' => [
-        'version' => '1.16.10',
+        'version' => '2.0.2',
     ],
     '@symfony/ux-google-map' => [
         'path' => './vendor/symfony/ux-google-map/assets/dist/map_controller.js',
@@ -93,12 +93,6 @@ return [
     ],
     '@symfony/ux-react' => [
         'path' => './vendor/symfony/ux-react/assets/dist/loader.js',
-    ],
-    'svelte/internal' => [
-        'version' => '3.59.2',
-    ],
-    '@symfony/ux-svelte' => [
-        'path' => './vendor/symfony/ux-svelte/assets/dist/loader.js',
     ],
     '@swup/fade-theme' => [
         'version' => '1.0.5',
@@ -176,5 +170,8 @@ return [
     'bootstrap/dist/css/bootstrap.min.css' => [
         'version' => '5.3.7',
         'type' => 'css',
+    ],
+    '@hotwired/hotwire-native-bridge' => [
+        'version' => '1.2.2',
     ],
 ];

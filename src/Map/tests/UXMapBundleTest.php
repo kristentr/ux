@@ -11,6 +11,7 @@
 
 namespace Symfony\UX\Map\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Symfony\Component\HttpKernel\Kernel;
@@ -31,11 +32,10 @@ class UXMapBundleTest extends TestCase
     }
 
     /**
-     * @dataProvider provideKernelClasses
-     *
      * @param class-string<Kernel> $kernelClass
      */
-    public function testBootKernel(string $kernelClass)
+    #[DataProvider('provideKernelClasses')]
+    public function testBootKernel(string $kernelClass): void
     {
         $kernel = new $kernelClass('test', true);
         $kernel->boot();
@@ -44,11 +44,10 @@ class UXMapBundleTest extends TestCase
     }
 
     /**
-     * @dataProvider provideKernelClasses
-     *
      * @param class-string<Kernel> $kernelClass
      */
-    public function testNullRendererAsDefault(string $kernelClass)
+    #[DataProvider('provideKernelClasses')]
+    public function testNullRendererAsDefault(string $kernelClass): void
     {
         $expectedRenderer = new NullRenderer(['symfony/ux-google-map', 'symfony/ux-leaflet-map']);
 

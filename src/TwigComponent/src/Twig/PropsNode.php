@@ -23,9 +23,20 @@ use Twig\Node\Node;
 #[YieldReady]
 class PropsNode extends Node
 {
-    public function __construct(array $propsNames, array $values, $lineno = 0)
+    /**
+     * @param array<string, string> $documentations The `## ...` documentation of each documented prop, keyed by name
+     */
+    public function __construct(array $propsNames, array $values, array $documentations = [], $lineno = 0)
     {
-        parent::__construct($values, ['names' => $propsNames], $lineno);
+        parent::__construct($values, ['names' => $propsNames, 'documentations' => $documentations], $lineno);
+    }
+
+    /**
+     * The `## ...` documentation attached to the given prop, or null when it is undocumented.
+     */
+    public function getPropDocumentation(string $name): ?string
+    {
+        return $this->getAttribute('documentations')[$name] ?? null;
     }
 
     public function compile(Compiler $compiler): void
@@ -47,7 +58,7 @@ class PropsNode extends Node
 
         foreach ($this->getAttribute('names') as $name) {
             $compiler
-                ->write('if (isset($context[\'__props\'][\''.$name.'\'])) {')
+                ->write('if (array_key_exists(\''.$name.'\', $context[\'__props\'] ?? [])) {')
                 ->raw("\n")
                 ->indent()
                 ->write('$componentClass = isset($context[\'this\']) ? get_debug_type($context[\'this\']) : "";')
@@ -59,13 +70,13 @@ class PropsNode extends Node
                 ->raw("\n")
             ;
 
-            $compiler->write('if (!isset($context[\''.$name.'\'])) {');
+            $compiler->write('if (!array_key_exists(\''.$name.'\', $context)) {');
 
             if (!$this->hasNode($name)) {
                 $compiler
                     ->write("\n")
                     ->indent()
-                    ->write('throw new \Twig\Error\RuntimeError("'.$name.' should be defined for component '.$this->getTemplateName().'.");')
+                    ->write('throw new \Twig\Error\RuntimeError(\'Prop "'.$name.'" should be defined.\');')
                     ->write("\n")
                     ->outdent()
                     ->write('}')
@@ -87,7 +98,7 @@ class PropsNode extends Node
             // overwrite the context value if a props with a similar name and a default value exist
             if ($this->hasNode($name)) {
                 $compiler
-                    ->write('if (isset($context[\'__context\'][\''.$name.'\'])) {')
+                    ->write('if (array_key_exists(\''.$name.'\', $context[\'__context\'] ?? [])) {')
                     ->raw("\n")
                     ->indent()
                     ->write('$context[\''.$name.'\'] = ')

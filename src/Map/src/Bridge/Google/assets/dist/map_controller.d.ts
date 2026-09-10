@@ -1,4 +1,4 @@
-import { LoaderOptions } from "@googlemaps/js-api-loader";
+import { APIOptions } from "@googlemaps/js-api-loader";
 import { Controller } from "@hotwired/stimulus";
 type Point = {
   lat: number;
@@ -42,23 +42,18 @@ type MarkerDefinition<BridgeMarkerOptions, BridgeInfoWindowOptions> = WithIdenti
   title: string | null;
   infoWindow?: Omit<InfoWindowDefinition<BridgeInfoWindowOptions>, 'position'>;
   icon?: Icon;
-  rawOptions?: BridgeMarkerOptions;
   bridgeOptions?: BridgeMarkerOptions;
   extra: ExtraData;
 }>;
 type PolygonDefinition<BridgePolygonOptions, BridgeInfoWindowOptions> = WithIdentifier<{
   infoWindow?: Omit<InfoWindowDefinition<BridgeInfoWindowOptions>, 'position'>;
   points: Array<Point> | Array<Array<Point>>;
-  title: string | null;
-  rawOptions?: BridgePolygonOptions;
   bridgeOptions?: BridgePolygonOptions;
   extra: ExtraData;
 }>;
 type PolylineDefinition<BridgePolylineOptions, BridgeInfoWindowOptions> = WithIdentifier<{
   infoWindow?: Omit<InfoWindowDefinition<BridgeInfoWindowOptions>, 'position'>;
   points: Array<Point>;
-  title: string | null;
-  rawOptions?: BridgePolylineOptions;
   bridgeOptions?: BridgePolylineOptions;
   extra: ExtraData;
 }>;
@@ -66,8 +61,6 @@ type CircleDefinition<BridgeCircleOptions, BridgeInfoWindowOptions> = WithIdenti
   infoWindow?: Omit<InfoWindowDefinition<BridgeInfoWindowOptions>, 'position'>;
   center: Point;
   radius: number;
-  title: string | null;
-  rawOptions?: BridgeCircleOptions;
   bridgeOptions?: BridgeCircleOptions;
   extra: ExtraData;
 }>;
@@ -75,8 +68,6 @@ type RectangleDefinition<BridgeRectangleOptions, BridgeInfoWindowOptions> = With
   infoWindow?: Omit<InfoWindowDefinition<BridgeInfoWindowOptions>, 'position'>;
   southWest: Point;
   northEast: Point;
-  title: string | null;
-  rawOptions?: BridgeRectangleOptions;
   bridgeOptions?: BridgeRectangleOptions;
   extra: ExtraData;
 }>;
@@ -86,7 +77,6 @@ type InfoWindowDefinition<BridgeInfoWindowOptions> = {
   position: Point;
   opened: boolean;
   autoClose: boolean;
-  rawOptions?: BridgeInfoWindowOptions;
   bridgeOptions?: BridgeInfoWindowOptions;
   extra: ExtraData;
 };
@@ -216,7 +206,7 @@ declare abstract class export_default$1<MapOptions, BridgeMapOptions, BridgeMap,
 }
 type MapOptions = Pick<google.maps.MapOptions, 'mapId' | 'gestureHandling' | 'backgroundColor' | 'disableDoubleClickZoom' | 'zoomControl' | 'zoomControlOptions' | 'mapTypeControl' | 'mapTypeControlOptions' | 'streetViewControl' | 'streetViewControlOptions' | 'fullscreenControl' | 'fullscreenControlOptions'>;
 declare class export_default extends export_default$1<MapOptions, google.maps.MapOptions, google.maps.Map, google.maps.marker.AdvancedMarkerElementOptions, google.maps.marker.AdvancedMarkerElement, google.maps.InfoWindowOptions, google.maps.InfoWindow, google.maps.PolygonOptions, google.maps.Polygon, google.maps.PolylineOptions, google.maps.Polyline, google.maps.CircleOptions, google.maps.Circle, google.maps.RectangleOptions, google.maps.Rectangle> {
-  providerOptionsValue: Pick<LoaderOptions, 'apiKey' | 'id' | 'language' | 'region' | 'nonce' | 'retries' | 'url' | 'version' | 'libraries'>;
+  providerOptionsValue: Pick<APIOptions, 'key' | 'v' | 'language' | 'region' | 'libraries' | 'authReferrerPolicy' | 'mapIds' | 'channel' | 'solutionChannel'>;
   map: google.maps.Map;
   connect(): Promise<void>;
   centerValueChanged(): void;

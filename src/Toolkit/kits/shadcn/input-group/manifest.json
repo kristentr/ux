@@ -2,11 +2,17 @@
     "$schema": "../../../schema-kit-recipe-v1.json",
     "type": "component",
     "name": "Input Group",
-    "description": "Wraps inputs with optional leading or trailing elements like icons or keyboard hints.",
+    "version-added": "3.0",
     "copy-files": {
         "templates/": "templates/"
     },
     "dependencies": {
-        "recipe": ["spinner"]
+        "composer": [
+            "twig/extra-bundle",
+            "twig/html-extra:^3.24.0",
+            "symfony/ux-twig-component:^3.5",
+            "tales-from-a-dev/twig-tailwind-extra:^1.3.0"
+        ],
+        "recipe": ["textarea", "input", "button"]
     }
 }

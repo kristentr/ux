@@ -20,10 +20,9 @@ use Symfony\Bundle\SecurityBundle\Security;
  *
  * @template T of object
  *
- * TODO Remove next lines for Symfony UX 3
+ * TODO Remove next lines for Symfony UX 4
  *
- * @method array getAttributes(object $entity) Returns extra attributes to add to the autocomplete result.
- * @method mixed getGroupBy()                  Return group_by option.
+ * @method string|false|null getTranslationDomain() Return the translation domain used for the "group_by" labels.
  */
 interface EntityAutocompleterInterface
 {
@@ -58,9 +57,11 @@ interface EntityAutocompleterInterface
     /**
      * Returns extra attributes to add to the autocomplete result.
      *
-     * TODO Uncomment for Symfony UX 3
+     * @param T $entity
+     *
+     * @return array<string, mixed>
      */
-    /* public function getAttributes(object $entity): array; */
+    public function getAttributes(object $entity): array;
 
     /**
      * Return true if access should be granted to the autocomplete results for the current user.
@@ -69,10 +70,19 @@ interface EntityAutocompleterInterface
      */
     public function isGranted(Security $security): bool;
 
-    /*
+    /**
      * Return group_by option.
      *
-     * TODO Uncomment for Symfony UX 3
+     * @return string|null
      */
-    /* public function getGroupBy(): mixed; */
+    public function getGroupBy(): mixed;
+
+    /*
+     * Return the translation domain used for the "group_by" labels.
+     *
+     * Returning null uses the default domain, false disables the translation.
+     *
+     * TODO Uncomment for Symfony UX 4
+     */
+    /* public function getTranslationDomain(): string|false|null; */
 }
